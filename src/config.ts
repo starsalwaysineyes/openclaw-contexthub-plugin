@@ -52,8 +52,6 @@ export function resolveConfig(raw: Record<string, unknown> | undefined): Context
   const cfg = (raw ?? {}) as Record<string, any>;
   const recall = (cfg.recall ?? {}) as Record<string, any>;
   const preAnswer = (recall.preAnswer ?? {}) as Record<string, any>;
-  const commit = (cfg.commit ?? {}) as Record<string, any>;
-  const afterAgentEnd = (commit.afterAgentEnd ?? {}) as Record<string, any>;
 
   return {
     baseUrl: String(cfg.baseUrl ?? process.env.CONTEXT_HUB_BASE_URL ?? "http://127.0.0.1:4040"),
@@ -67,15 +65,6 @@ export function resolveConfig(raw: Record<string, unknown> | undefined): Context
         layers: parseLayers(preAnswer.layers?.join?.(",") ?? process.env.CONTEXT_HUB_RECALL_LAYERS, ["l0"]),
         limit: Number(preAnswer.limit ?? process.env.CONTEXT_HUB_RECALL_LIMIT ?? 5),
         rerank: Boolean(preAnswer.rerank ?? parseBool(process.env.CONTEXT_HUB_RECALL_RERANK, false)),
-      },
-    },
-    commit: {
-      afterAgentEnd: {
-        enabled: Boolean(afterAgentEnd.enabled ?? parseBool(process.env.CONTEXT_HUB_COMMIT_AFTER_AGENT_END_ENABLED, false)),
-        partitionKey: String(afterAgentEnd.partitionKey ?? process.env.CONTEXT_HUB_COMMIT_AFTER_AGENT_END_PARTITION_KEY ?? "") || undefined,
-        writeMemory: Boolean(afterAgentEnd.writeMemory ?? parseBool(process.env.CONTEXT_HUB_COMMIT_AFTER_AGENT_END_WRITE_MEMORY, false)),
-        memoryLayer: String(afterAgentEnd.memoryLayer ?? process.env.CONTEXT_HUB_COMMIT_AFTER_AGENT_END_MEMORY_LAYER ?? "l0").toLowerCase() as RecallLayer,
-        maxSummaryChars: Number(afterAgentEnd.maxSummaryChars ?? process.env.CONTEXT_HUB_COMMIT_AFTER_AGENT_END_MAX_SUMMARY_CHARS ?? 1200),
       },
     },
     importPresets: resolveImportPresets(cfg.importPresets),

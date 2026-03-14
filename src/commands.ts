@@ -2,8 +2,8 @@ import * as fs from "node:fs";
 import type { PluginCommandContext } from "openclaw/plugin-sdk";
 import { ContextHubHttpClient } from "./contexthub.js";
 import { runImportPreset } from "./importer.js";
-import { buildImportFilePayload, buildSaveTextPayload } from "./payloads.js";
-import type { ContextHubPluginConfig, RecallLayer } from "./types.js";
+import { buildImportFilePayload, buildSaveTextPayload, buildUploadLastSessionPayload } from "./payloads.js";
+import type { ContextHubPluginConfig, LastSessionCapture, RecallLayer } from "./types.js";
 
 function parseLayer(raw: string): RecallLayer {
   const normalized = raw.trim().toLowerCase();
@@ -135,6 +135,25 @@ function parseQueryArgs(
   return { query, partitions, layers, limit, rerank };
 }
 
+function parseUploadLastSessionArgs(args: string | undefined, defaultPartitionKey?: string): {
+  partitionKey: string;
+  titleOverride?: string;
+} {
+  const input = args?.trim() || "";
+  if (!input) {
+    if (!defaultPartitionKey) throw new Error("usage: /contexthub-upload-last-session <partitionKey|-> [:: title]");
+    return { partitionKey: defaultPartitionKey };
+  }
+  const parts = input.split("::").map((item) => item.trim());
+  const partitionToken = parts[0];
+  const partitionKey = partitionToken === "-" ? defaultPartitionKey : partitionToken;
+  if (!partitionKey) throw new Error("partitionKey is required (or configure defaultPartitionKey)");
+  return {
+    partitionKey,
+    titleOverride: parts[1] || undefined,
+  };
+}
+
 function textReply(text: string, isError = false) {
   return { text, isError };
 }
@@ -143,8 +162,9 @@ export function registerPluginCommands(params: {
   api: { registerCommand: Function };
   config: ContextHubPluginConfig;
   client: ContextHubHttpClient;
+  state: { lastSessionCapture: LastSessionCapture | null };
 }) {
-  const { api, config, client } = params;
+  const { api, config, client, state } = params;
 
   api.registerCommand({
     name: "contexthub-recall",
@@ -196,6 +216,48 @@ export function registerPluginCommands(params: {
     requireAuth: true,
     handler: async () => {
       return textReply(JSON.stringify({ importPresets: config.importPresets }, null, 2));
+    },
+  });
+
+  api.registerCommand({
+    name: "contexthub-last-session",
+    description: "Show cached last completed OpenClaw session capture",
+    acceptsArgs: false,
+    requireAuth: true,
+    handler: async () => {
+      if (!state.lastSessionCapture) return textReply("no cached session available", true);
+      const capture = state.lastSessionCapture;
+      return textReply(JSON.stringify({
+        capturedAt: capture.capturedAt,
+        success: capture.success,
+        durationMs: capture.durationMs,
+        messageCount: capture.messageCount,
+        title: capture.title,
+        idempotencyKey: capture.idempotencyKey,
+      }, null, 2));
+    },
+  });
+
+  api.registerCommand({
+    name: "contexthub-upload-last-session",
+    description: "Upload cached full session transcript to L2: /contexthub-upload-last-session <partitionKey|-> [:: title]",
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: async (ctx: PluginCommandContext) => {
+      try {
+        const capture = state.lastSessionCapture;
+        if (!capture) throw new Error("no cached session available; wait until a session completes first");
+        const parsed = parseUploadLastSessionArgs(ctx.args, config.defaultPartitionKey);
+        const result = await client.importResource(buildUploadLastSessionPayload({
+          config,
+          partitionKey: parsed.partitionKey,
+          capture,
+          titleOverride: parsed.titleOverride,
+        }));
+        return textReply(JSON.stringify({ action: "upload-last-session", record: (result as any).record, derivation: (result as any).derivation }, null, 2));
+      } catch (error) {
+        return textReply(String(error), true);
+      }
     },
   });
 

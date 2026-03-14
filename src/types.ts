@@ -9,14 +9,6 @@ export interface PreAnswerRecallConfig {
   rerank: boolean;
 }
 
-export interface AfterAgentEndCommitConfig {
-  enabled: boolean;
-  partitionKey?: string;
-  writeMemory: boolean;
-  memoryLayer: RecallLayer;
-  maxSummaryChars: number;
-}
-
 export interface ImportPreset {
   rootPath: string;
   partitionKey: string;
@@ -27,6 +19,17 @@ export interface ImportPreset {
   tags: string[];
 }
 
+export interface LastSessionCapture {
+  capturedAt: string;
+  success: boolean;
+  error?: string | null;
+  durationMs?: number;
+  messageCount: number;
+  title: string;
+  transcript: string;
+  idempotencyKey: string;
+}
+
 export interface ContextHubPluginConfig {
   baseUrl: string;
   token?: string;
@@ -34,9 +37,6 @@ export interface ContextHubPluginConfig {
   defaultPartitionKey?: string;
   recall: {
     preAnswer: PreAnswerRecallConfig;
-  };
-  commit: {
-    afterAgentEnd: AfterAgentEndCommitConfig;
   };
   importPresets: Record<string, ImportPreset>;
 }

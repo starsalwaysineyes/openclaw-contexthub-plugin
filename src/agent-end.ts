@@ -1,5 +1,5 @@
-import type { ContextHubPluginConfig } from "./types.js";
-import { ContextHubHttpClient } from "./contexthub.js";
+import { createHash } from "node:crypto";
+import type { LastSessionCapture } from "./types.js";
 
 function flattenText(value: unknown): string[] {
   if (value == null) return [];
@@ -28,56 +28,63 @@ function extractText(message: unknown): string {
   return text.replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function summarizeTitle(text: string): string {
-  const firstLine = text.split(/\n+/)[0]?.trim() || "Session summary";
-  return firstLine.slice(0, 80);
+function summarizeTitle(messages: Array<{ role: string; content: string }>): string {
+  const lastUser = [...messages].reverse().find((entry) => entry.role === "user");
+  const firstLine = lastUser?.content.split(/\n+/)[0]?.trim();
+  if (firstLine) return firstLine.slice(0, 80);
+  return "OpenClaw session transcript";
 }
 
-export async function commitAfterAgentEnd(params: {
-  client: ContextHubHttpClient;
-  config: ContextHubPluginConfig;
-  event: { messages?: unknown[]; success?: boolean; error?: string; durationMs?: number };
-  logger: { warn: (...args: unknown[]) => void };
-}) {
-  const cfg = params.config.commit.afterAgentEnd;
-  if (!cfg.enabled || !params.event.success) return;
-  const partitionKey = cfg.partitionKey ?? params.config.defaultPartitionKey;
-  if (!partitionKey) {
-    params.logger.warn("contexthub-plugin: no partition key configured for afterAgentEnd commit");
-    return;
-  }
+function buildTranscript(params: {
+  capturedAt: string;
+  success: boolean;
+  error?: string;
+  durationMs?: number;
+  messages: Array<{ role: string; content: string }>;
+}): string {
+  const header = [
+    "# OpenClaw session transcript",
+    `capturedAt: ${params.capturedAt}`,
+    `success: ${params.success}`,
+    `durationMs: ${params.durationMs ?? 0}`,
+    `messageCount: ${params.messages.length}`,
+  ];
+  if (params.error) header.push(`error: ${params.error}`);
 
-  const messages = Array.isArray(params.event.messages) ? params.event.messages : [];
+  const body = params.messages.flatMap((message, index) => [
+    `\n## ${index + 1}. ${message.role}`,
+    message.content,
+  ]);
+
+  return [...header, ...body].join("\n").trim();
+}
+
+export function captureLastSession(event: { messages?: unknown[]; success?: boolean; error?: string; durationMs?: number }): LastSessionCapture | null {
+  const messages = Array.isArray(event.messages) ? event.messages : [];
   const extracted = messages
     .map((message) => ({ role: extractRole(message), content: extractText(message) }))
-    .filter((entry) => entry.role && entry.content);
+    .filter((entry): entry is { role: string; content: string } => Boolean(entry.role && entry.content));
 
-  const lastAssistant = [...extracted].reverse().find((entry) => entry.role === "assistant");
-  if (!lastAssistant) return;
-  const lastUser = [...extracted].reverse().find((entry) => entry.role === "user");
-  const summary = lastAssistant.content.slice(0, cfg.maxSummaryChars).trim();
-  if (!summary) return;
+  if (extracted.length === 0) return null;
 
-  const payload: Record<string, unknown> = {
-    tenantId: params.config.tenantId,
-    partitionKey,
-    summary,
-    messages: [lastUser, { role: "assistant", content: summary }].filter(Boolean),
-    memoryEntries: cfg.writeMemory ? [{
-      title: summarizeTitle(summary),
-      text: summary,
-      layer: cfg.memoryLayer,
-      importance: 3.0,
-      tags: ["auto-commit", "agent-end"],
-    }] : [],
-    metadata: {
-      adapter: "openclaw-contexthub-plugin",
-      hook: "agent_end",
-      success: Boolean(params.event.success),
-      durationMs: params.event.durationMs,
-      error: params.event.error ?? null,
-    },
+  const capturedAt = new Date().toISOString();
+  const transcript = buildTranscript({
+    capturedAt,
+    success: Boolean(event.success),
+    error: event.error,
+    durationMs: event.durationMs,
+    messages: extracted,
+  });
+  const idempotencyKey = `plugin-session:${createHash("sha1").update(transcript).digest("hex").slice(0, 16)}`;
+
+  return {
+    capturedAt,
+    success: Boolean(event.success),
+    error: event.error ?? null,
+    durationMs: event.durationMs,
+    messageCount: extracted.length,
+    title: summarizeTitle(extracted),
+    transcript,
+    idempotencyKey,
   };
-
-  await params.client.commitSession(payload);
 }

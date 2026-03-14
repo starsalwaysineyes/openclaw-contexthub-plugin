@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ContextHubPluginConfig, RecallLayer } from "./types.js";
+import type { ContextHubPluginConfig, LastSessionCapture, RecallLayer } from "./types.js";
 
 const HEADING_RE = /^#\s+(.+?)\s*$/m;
 
@@ -76,6 +76,38 @@ export function buildImportFilePayload(params: {
       localPath: resolved,
     },
     idempotencyKey: fileIdempotencyKey(resolved, params.layer),
+    derive: { enabled: false, mode: "sync", emitLayers: [], provider: "litellm", promptPreset: "archive_and_memory" },
+  };
+}
+
+export function buildUploadLastSessionPayload(params: {
+  config: ContextHubPluginConfig;
+  partitionKey: string;
+  capture: LastSessionCapture;
+  titleOverride?: string;
+}): Record<string, unknown> {
+  return {
+    tenantId: params.config.tenantId,
+    partitionKey: params.partitionKey,
+    type: defaultTypeForLayer("l2"),
+    targetLayer: "l2",
+    title: params.titleOverride?.trim() || params.capture.title,
+    content: { kind: "inline_text", text: params.capture.transcript },
+    source: {
+      kind: "openclaw_session",
+      capturedAt: params.capture.capturedAt,
+    },
+    tags: ["session", "raw", "openclaw"],
+    metadata: {
+      adapter: "openclaw-contexthub-plugin",
+      sourceKind: "openclaw_session",
+      capturedAt: params.capture.capturedAt,
+      success: params.capture.success,
+      durationMs: params.capture.durationMs,
+      messageCount: params.capture.messageCount,
+      error: params.capture.error,
+    },
+    idempotencyKey: params.capture.idempotencyKey,
     derive: { enabled: false, mode: "sync", emitLayers: [], provider: "litellm", promptPreset: "archive_and_memory" },
   };
 }

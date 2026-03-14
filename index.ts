@@ -1,8 +1,9 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { commitAfterAgentEnd } from "./src/agent-end.js";
+import { captureLastSession } from "./src/agent-end.js";
 import { registerPluginCommands } from "./src/commands.js";
 import { ContextHubHttpClient } from "./src/contexthub.js";
 import { resolveConfig } from "./src/config.js";
+import type { LastSessionCapture } from "./src/types.js";
 
 const pluginConfigSchema = {
   type: "object" as const,
@@ -23,21 +24,6 @@ const pluginConfigSchema = {
             layers: { type: "array" as const, items: { type: "string" as const }, description: "Layers queried by pre-answer recall (default: l0 only)" },
             limit: { type: "number" as const, description: "Max recall hits for one turn" },
             rerank: { type: "boolean" as const, description: "Enable rerank on recall" },
-          },
-        },
-      },
-    },
-    commit: {
-      type: "object" as const,
-      properties: {
-        afterAgentEnd: {
-          type: "object" as const,
-          properties: {
-            enabled: { type: "boolean" as const, description: "Automatically commit final assistant summary after successful runs" },
-            partitionKey: { type: "string" as const, description: "Partition used by automatic post-task commit" },
-            writeMemory: { type: "boolean" as const, description: "Whether automatic post-task commit should also write one memory entry" },
-            memoryLayer: { type: "string" as const, description: "Layer used for the optional auto memory entry" },
-            maxSummaryChars: { type: "number" as const, description: "Clip assistant summary before commit" },
           },
         },
       },
@@ -71,8 +57,9 @@ const plugin = {
   register(api: OpenClawPluginApi) {
     const config = resolveConfig((api.pluginConfig ?? {}) as Record<string, unknown>);
     const client = new ContextHubHttpClient({ baseUrl: config.baseUrl, token: config.token });
+    const state: { lastSessionCapture: LastSessionCapture | null } = { lastSessionCapture: null };
 
-    registerPluginCommands({ api, config, client });
+    registerPluginCommands({ api, config, client, state });
 
     api.on("before_agent_start", async (event: { prompt?: string }) => {
       const recall = config.recall.preAnswer;
@@ -112,16 +99,7 @@ const plugin = {
     }, { priority: 20 });
 
     api.on("agent_end", async (event: { messages?: unknown[]; success?: boolean; error?: string; durationMs?: number }) => {
-      try {
-        await commitAfterAgentEnd({
-          client,
-          config,
-          event,
-          logger: api.logger,
-        });
-      } catch (error) {
-        api.logger.warn(`contexthub-plugin: automatic post-task commit failed: ${String(error)}`);
-      }
+      state.lastSessionCapture = captureLastSession(event);
     }, { priority: 10 });
   },
 };

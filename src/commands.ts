@@ -182,13 +182,31 @@ function formatQuerySummary(payload: {
 }): string {
   const items = payload.result.items ?? [];
   const retrieval = payload.result.retrieval ?? {};
+  const grouped = new Map<string, { top: Record<string, any>; hits: number }>();
+  for (const item of items) {
+    const key = String(item.recordId ?? item.chunkId ?? Math.random());
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { top: item, hits: 1 });
+      continue;
+    }
+    existing.hits += 1;
+    if (Number(item.score ?? 0) > Number(existing.top.score ?? 0)) {
+      existing.top = item;
+    }
+  }
+  const unique = [...grouped.values()]
+    .sort((a, b) => Number(b.top.score ?? 0) - Number(a.top.score ?? 0))
+    .slice(0, 5);
+
   const lines = [
     `query: ${payload.query.query}`,
     `scope: partitions=${payload.query.partitions.join(",") || "(all readable)"} layers=${payload.query.layers.join(",")}`,
-    `retrieval: hits=${items.length} embeddings=${Boolean(retrieval.usedEmbeddings)} rerank=${Boolean(retrieval.usedRerank)} candidates=${retrieval.candidateCount ?? "?"}`,
+    `retrieval: uniqueRecords=${grouped.size} rawHits=${items.length} embeddings=${Boolean(retrieval.usedEmbeddings)} rerank=${Boolean(retrieval.usedRerank)} candidates=${retrieval.candidateCount ?? "?"}`,
   ];
-  for (const [index, item] of items.slice(0, 5).entries()) {
-    lines.push(`${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey}) score=${Number(item.score ?? 0).toFixed(3)}`);
+  for (const [index, entry] of unique.entries()) {
+    const item = entry.top;
+    lines.push(`${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey}) score=${Number(item.score ?? 0).toFixed(3)} hits=${entry.hits}`);
     lines.push(`   ${truncate(String(item.snippet ?? ""), 180)}`);
   }
   return lines.join("\n");

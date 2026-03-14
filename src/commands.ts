@@ -285,9 +285,26 @@ function textReply(text: string, isError = false) {
   return { text, isError };
 }
 
+function formatScopeSummary(scope: any): string | null {
+  if (!scope) return null;
+  const requestedPartitions = (scope.requestedPartitions ?? []).join(",") || "-";
+  const effectivePartitions = (scope.effectivePartitions ?? []).join(",") || "-";
+  const requestedLayers = (scope.requestedLayers ?? []).join(",") || "-";
+  const requestedTags = (scope.requestedTags ?? []).join(",") || "-";
+  const layerRules = scope.effectiveLayerRules
+    ? Object.entries(scope.effectiveLayerRules as Record<string, string[]>)
+        .map(([partition, layers]) => `${partition}:${layers.join(",")}`)
+        .join(" ")
+    : "-";
+  return [
+    `scope: auth=${scope.authKind ?? "?"} requestedPartitions=${requestedPartitions} effectivePartitions=${effectivePartitions}`,
+    `filters: layers=${requestedLayers} tags=${requestedTags} layerRules=${layerRules}`,
+  ].join("\n");
+}
+
 function formatQuerySummary(payload: {
   query: { query: string; partitions: string[]; layers: RecallLayer[]; tags?: string[]; limit: number; rerank: boolean };
-  result: { items?: Array<Record<string, any>>; retrieval?: Record<string, any> };
+  result: { items?: Array<Record<string, any>>; retrieval?: Record<string, any>; scope?: Record<string, any> };
 }): string {
   const items = payload.result.items ?? [];
   const retrieval = payload.result.retrieval ?? {};
@@ -310,7 +327,7 @@ function formatQuerySummary(payload: {
 
   const lines = [
     `query: ${payload.query.query}`,
-    `scope: partitions=${payload.query.partitions.join(",") || "(all readable)"} layers=${payload.query.layers.join(",")} tags=${payload.query.tags?.join(",") || "-"}`,
+    formatScopeSummary(payload.result.scope) ?? `scope: partitions=${payload.query.partitions.join(",") || "(all readable)"} layers=${payload.query.layers.join(",")} tags=${payload.query.tags?.join(",") || "-"}`,
     `retrieval: uniqueRecords=${grouped.size} rawHits=${items.length} embeddings=${Boolean(retrieval.usedEmbeddings)} rerank=${Boolean(retrieval.usedRerank)} candidates=${retrieval.candidateCount ?? "?"}`,
   ];
   for (const [index, entry] of unique.entries()) {
@@ -352,7 +369,10 @@ function formatImportFileSummary(result: any): string {
 function formatTreeSummary(result: any): string {
   const items = result.items ?? [];
   const summary = result.summary ?? {};
-  const lines = [`path: ${result.pathPrefix || "/"}`, `nodes: ${items.length}`, `matchedRecords: ${summary.totalMatchedRecords ?? 0}`];
+  const lines = [`path: ${result.pathPrefix || "/"}`];
+  const scopeSummary = formatScopeSummary(result.scope);
+  if (scopeSummary) lines.push(scopeSummary);
+  lines.push(`nodes: ${items.length}`, `matchedRecords: ${summary.totalMatchedRecords ?? 0}`);
   for (const [index, item] of items.slice(0, 10).entries()) {
     lines.push(`${index + 1}. ${item.kind === "dir" ? "[dir]" : "[file]"} ${item.path} records=${item.recordCount}`);
   }
@@ -362,7 +382,10 @@ function formatTreeSummary(result: any): string {
 function formatListSummary(result: any): string {
   const items = result.items ?? [];
   const page = result.page ?? {};
-  const lines = [`records: ${items.length}`, `hasMore: ${Boolean(page.hasMore)}`, `totalMatched: ${page.totalMatched ?? items.length}`];
+  const lines = [] as string[];
+  const scopeSummary = formatScopeSummary(result.scope);
+  if (scopeSummary) lines.push(scopeSummary);
+  lines.push(`records: ${items.length}`, `hasMore: ${Boolean(page.hasMore)}`, `totalMatched: ${page.totalMatched ?? items.length}`);
   for (const [index, item] of items.slice(0, 8).entries()) {
     const sourcePath = String(item.source?.relativePath ?? item.source?.path ?? "-");
     lines.push(`${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey})`);
@@ -388,8 +411,10 @@ function formatGrepSummary(result: any): string {
   const search = result.search ?? {};
   const lines = [
     `grep: pattern=${search.pattern ?? ""} regex=${Boolean(search.regex)} caseSensitive=${Boolean(search.caseSensitive)}`,
-    `scope: scannedRecords=${search.scannedRecords ?? 0} matchedRecords=${search.matchedRecords ?? 0} returnedMatches=${search.returnedMatches ?? 0}`,
   ];
+  const scopeSummary = formatScopeSummary(result.scope);
+  if (scopeSummary) lines.push(scopeSummary);
+  lines.push(`scope: scannedRecords=${search.scannedRecords ?? 0} matchedRecords=${search.matchedRecords ?? 0} returnedMatches=${search.returnedMatches ?? 0}`);
   for (const [index, item] of (result.items ?? []).slice(0, 8).entries()) {
     lines.push(`${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey}) line ${item.lineNumber}`);
     lines.push(`   ${truncate(String(item.text ?? ""), 180)}`);

@@ -35,6 +35,18 @@ function normalizeStringArray(raw: unknown): string[] {
   return raw.map((item) => String(item).trim()).filter(Boolean);
 }
 
+function summarizeScope(scope: any): string[] {
+  if (!scope) return [];
+  const requestedPartitions = (scope.requestedPartitions ?? []).join(",") || "-";
+  const effectivePartitions = (scope.effectivePartitions ?? []).join(",") || "-";
+  const requestedLayers = (scope.requestedLayers ?? []).join(",") || "-";
+  const requestedTags = (scope.requestedTags ?? []).join(",") || "-";
+  return [
+    `scope: auth=${scope.authKind ?? "?"} requestedPartitions=${requestedPartitions} effectivePartitions=${effectivePartitions}`,
+    `filters: layers=${requestedLayers} tags=${requestedTags}`,
+  ];
+}
+
 export function registerPluginTools(params: {
   api: { registerTool: Function };
   config: ContextHubPluginConfig;
@@ -72,7 +84,7 @@ export function registerPluginTools(params: {
           rerank: typeof params.rerank === "boolean" ? params.rerank : config.recall.preAnswer.rerank,
         });
         const items = result.items ?? [];
-        const lines = [`query: ${query}`, `hits: ${items.length}`];
+        const lines = [`query: ${query}`, ...summarizeScope((result as any).scope), `hits: ${items.length}`];
         for (const [index, item] of items.slice(0, 5).entries()) {
           lines.push(`${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey})`);
           lines.push(`   ${truncate(item.snippet ?? "", 180)}`);
@@ -137,6 +149,7 @@ export function registerPluginTools(params: {
         });
         const lines = [
           `path: ${result.pathPrefix || "/"}`,
+          ...summarizeScope((result as any).scope),
           `nodes: ${result.items.length}`,
           `matchedRecords: ${result.summary?.totalMatchedRecords ?? 0}`,
         ];
@@ -178,6 +191,7 @@ export function registerPluginTools(params: {
         });
         const items = result.items ?? [];
         const lines = [
+          ...summarizeScope((result as any).scope),
           `records: ${items.length}`,
           `hasMore: ${Boolean(result.page?.hasMore)}`,
         ];
@@ -225,6 +239,7 @@ export function registerPluginTools(params: {
         });
         const lines = [
           `pattern: ${pattern}`,
+          ...summarizeScope((result as any).scope),
           `matches: ${result.items?.length ?? 0}`,
           ...(result.items ?? []).slice(0, 8).flatMap((item, index) => [
             `${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey}) line ${item.lineNumber}`,

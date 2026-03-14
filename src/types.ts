@@ -98,9 +98,26 @@ export interface QueryItem {
   source?: unknown;
 }
 
+export interface ResponseScope {
+  tenantId: string;
+  authKind: string;
+  authScoped: boolean;
+  requestedPartitions: string[];
+  effectivePartitions: string[];
+  requestedTypes?: string[];
+  requestedLayers?: string[];
+  requestedTags?: string[];
+  effectiveLayerRules?: Record<string, string[]> | null;
+  sourceKind?: string;
+  sourcePathPrefix?: string;
+  pathPrefix?: string;
+  titleContains?: string;
+}
+
 export interface QueryResponse {
   items: QueryItem[];
   retrieval?: Record<string, unknown>;
+  scope?: ResponseScope;
 }
 
 export interface ListRecordItem {
@@ -123,6 +140,7 @@ export interface ListRecordItem {
 export interface ListRecordsResponse {
   items: ListRecordItem[];
   page?: Record<string, unknown>;
+  scope?: ResponseScope;
 }
 
 export interface BrowseTreeNode {
@@ -138,6 +156,7 @@ export interface BrowseTreeResponse {
   pathPrefix: string;
   items: BrowseTreeNode[];
   summary?: Record<string, unknown>;
+  scope?: ResponseScope;
 }
 
 export interface RecordReadLine {
@@ -169,6 +188,7 @@ export interface GrepHit {
 export interface GrepResponse {
   items: GrepHit[];
   search?: Record<string, unknown>;
+  scope?: ResponseScope;
 }
 
 export interface DerivationJob {

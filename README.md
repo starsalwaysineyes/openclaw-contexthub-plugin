@@ -93,7 +93,7 @@ Implemented in this repo now:
 
 Not implemented yet:
 
-- operator-friendly explain-recall output beyond the current compact summary / `--json` split (record-level grouping now exists, but trace explanation is still thin)
+- operator-friendly explain-recall output beyond the current compact summary / `--json` split (record-level grouping plus effective-scope hints now exist, but trace explanation is still thin)
 - true file/blob upload once backend supports non-inline payloads
 - richer preset lifecycle and validation UX
 - smarter capture rules so `/contexthub-last-session` can optionally track non-chat command flows too

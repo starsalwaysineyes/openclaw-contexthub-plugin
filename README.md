@@ -48,8 +48,14 @@ Implemented in this repo now:
 
 - minimal `before_agent_start` hook
 - `agent_end` cache of the last completed session transcript (no automatic write)
-- ContextHub HTTP client for `query`, `importResource`, `commitSession`, `getDerivationJob`, `listRecordLinks`
+- ContextHub HTTP client for `query`, `grep`, `readRecordLines`, `importResource`, `commitSession`, `getDerivationJob`, `listRecordLinks`
 - config resolution from plugin config + env
+- agent-facing tools:
+  - `ctx_query`
+  - `ctx_read`
+  - `ctx_grep`
+  - `ctx_write_text` (optional)
+  - `ctx_import_file` (optional)
 - preferred short operator entrypoint:
   - `/ctx q ...`
   - `/ctx g ...`
@@ -143,7 +149,7 @@ An agent needs four practical abilities:
 3. upload raw session/doc/file content when a human wants raw retrieval
 4. inspect async jobs and links when something looks wrong
 
-This repo now covers all four at a first-pass level, plus preset-based batch import flow, explicit last-session upload, the first line-oriented read/grep bridge to ContextHub, and a shorter `/ctx` operator surface.
+This repo now covers all four at a first-pass level, plus preset-based batch import flow, explicit last-session upload, the first line-oriented read/grep bridge to ContextHub, a shorter `/ctx` operator surface, and the first agent-facing `registerTool(...)` layer.
 
 ## Product rule that should stay
 

@@ -3,6 +3,7 @@ import { captureLastSession } from "./src/agent-end.js";
 import { registerPluginCommands } from "./src/commands.js";
 import { ContextHubHttpClient } from "./src/contexthub.js";
 import { resolveConfig } from "./src/config.js";
+import { registerPluginTools } from "./src/tools.js";
 import type { LastSessionCapture } from "./src/types.js";
 
 const pluginConfigSchema = {
@@ -60,6 +61,7 @@ const plugin = {
     const state: { lastSessionCapture: LastSessionCapture | null } = { lastSessionCapture: null };
 
     registerPluginCommands({ api, config, client, state });
+    registerPluginTools({ api, config, client });
 
     api.on("before_agent_start", async (event: { prompt?: string }) => {
       const recall = config.recall.preAnswer;

@@ -28,5 +28,14 @@ declare module "openclaw/plugin-sdk" {
       requireAuth?: boolean;
       handler: (ctx: PluginCommandContext) => Promise<{ text?: string; isError?: boolean } | void> | { text?: string; isError?: boolean } | void;
     }) => void;
+    registerTool: (
+      tool: {
+        name: string;
+        description: string;
+        parameters: Record<string, unknown>;
+        execute: (toolCallId: string, params: Record<string, unknown>) => Promise<{ content: Array<{ type: string; text: string }>; details?: Record<string, unknown> }>;
+      },
+      opts?: { optional?: boolean; name?: string; names?: string[] },
+    ) => void;
   };
 }

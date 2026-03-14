@@ -41,6 +41,8 @@ function normalizePreset(input: Record<string, any> | undefined): ImportPreset |
     relativePathPrefix: input.relativePathPrefix == null ? undefined : String(input.relativePathPrefix).trim() || undefined,
     promptPreset: input.promptPreset == null ? undefined : String(input.promptPreset).trim() || undefined,
     metadata: input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata) ? input.metadata : undefined,
+    includeGlobs: Array.isArray(input.includeGlobs) ? input.includeGlobs.map((item) => String(item)) : parseCsv(input.includeGlobs, []),
+    excludeGlobs: Array.isArray(input.excludeGlobs) ? input.excludeGlobs.map((item) => String(item)) : parseCsv(input.excludeGlobs, []),
   };
 }
 

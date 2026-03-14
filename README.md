@@ -126,6 +126,8 @@ Not implemented yet:
       "relativePathPrefix": "archive",
       "promptPreset": "archive_and_memory",
       "metadata": { "migrationPreset": "archive" },
+      "includeGlobs": ["**/*.md"],
+      "excludeGlobs": ["drafts/**"],
       "tags": ["archive", "migration"]
     }
   }

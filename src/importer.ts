@@ -6,16 +6,38 @@ import type { ContextHubPluginConfig, ImportPreset } from "./types.js";
 
 const HEADING_RE = /^#\s+(.+?)\s*$/m;
 
-function discoverMarkdownFiles(rootPath: string): string[] {
-  const found: string[] = [];
-  for (const entry of fs.readdirSync(rootPath, { withFileTypes: true })) {
-    const resolved = path.join(rootPath, entry.name);
-    if (entry.isDirectory()) {
-      found.push(...discoverMarkdownFiles(resolved));
-      continue;
+function matchesAnyGlob(relativePath: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => {
+    const normalized = pattern.trim();
+    if (!normalized) return false;
+    if (path.posix.matchesGlob(relativePath, normalized)) return true;
+    if (normalized.endsWith('/**')) {
+      const prefix = normalized.slice(0, -3).replace(/\/+$/, '');
+      return relativePath === prefix || relativePath.startsWith(`${prefix}/`);
     }
-    if (entry.isFile() && resolved.endsWith('.md')) found.push(resolved);
+    return false;
+  });
+}
+
+function discoverMarkdownFiles(rootPath: string, includeGlobs: string[] = [], excludeGlobs: string[] = []): string[] {
+  const found: string[] = [];
+
+  function walk(currentPath: string) {
+    for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+      const resolved = path.join(currentPath, entry.name);
+      if (entry.isDirectory()) {
+        walk(resolved);
+        continue;
+      }
+      if (!entry.isFile() || !resolved.endsWith('.md')) continue;
+      const relativePath = path.relative(rootPath, resolved).split(path.sep).join('/');
+      if (includeGlobs.length > 0 && !matchesAnyGlob(relativePath, includeGlobs)) continue;
+      if (excludeGlobs.length > 0 && matchesAnyGlob(relativePath, excludeGlobs)) continue;
+      found.push(resolved);
+    }
   }
+
+  walk(rootPath);
   return found.sort();
 }
 
@@ -49,7 +71,7 @@ export async function runImportPreset(params: {
     throw new Error(`preset root path not found: ${rootPath}`);
   }
 
-  let files = discoverMarkdownFiles(rootPath);
+  let files = discoverMarkdownFiles(rootPath, preset.includeGlobs ?? [], preset.excludeGlobs ?? []);
   const limit = params.overrideLimit ?? preset.limit;
   if (limit != null) files = files.slice(0, limit);
 

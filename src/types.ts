@@ -22,6 +22,8 @@ export interface ImportPreset {
   relativePathPrefix?: string;
   promptPreset?: string;
   metadata?: Record<string, unknown>;
+  includeGlobs?: string[];
+  excludeGlobs?: string[];
 }
 
 export interface LastSessionCapture {

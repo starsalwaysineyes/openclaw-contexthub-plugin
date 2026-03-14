@@ -2,7 +2,7 @@
 
 Official plugin maintained by MemTensor.
 
-OpenClaw plugin skeleton for ContextHub.
+OpenClaw tool-first plugin for ContextHub.
 
 Current focus:
 
@@ -19,7 +19,7 @@ Current focus:
 
 - query ContextHub before answering
 - default to `L0` only for pre-answer recall
-- allow config overrides for partitions / layers / limit / rerank
+- allow config overrides for partitions / layers / tags / limit / rerank
 - inject recalled snippets through `prependContext`
 
 ### Write
@@ -64,6 +64,8 @@ Implemented in this repo now:
 - preferred short operator entrypoint:
   - `/ctx q ...`
   - `/ctx g ...`
+  - `/ctx t ...`
+  - `/ctx ls ...`
   - `/ctx r ...`
   - `/ctx s ...`
   - `/ctx c ...`
@@ -75,8 +77,8 @@ Implemented in this repo now:
   - `/ctx up ...`
 - long-form compatibility commands are still available:
   - `/contexthub-recall`
-  - `/contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank] [--json]`
-  - `/contexthub-grep <pattern> [:: partitions] [:: layers] [:: limit] [:: regex] [:: caseSensitive] [--json]`
+  - `/contexthub-query <query> [:: partitions] [:: layers] [:: tags] [:: limit] [:: rerank] [--json]`
+  - `/contexthub-grep <pattern> [:: partitions] [:: layers] [:: tags] [:: limit] [:: regex] [:: caseSensitive] [--json]`
   - `/contexthub-presets`
   - `/contexthub-read <recordId> [:: fromLine] [:: limit] [--json]`
   - `/contexthub-last-session`
@@ -154,7 +156,7 @@ An agent needs four practical abilities:
 3. upload raw session/doc/file content when a human wants raw retrieval
 4. inspect async jobs and links when something looks wrong
 
-This repo now covers all four at a first-pass level, plus preset-based batch import flow, explicit last-session upload, the first line-oriented read/grep bridge to ContextHub, a shorter `/ctx` operator surface, and the first agent-facing `registerTool(...)` layer.
+This repo now covers all four at a first-pass level, plus preset-based batch import flow, explicit last-session upload, the first line-oriented read/grep bridge to ContextHub, a shorter `/ctx` operator surface, the first agent-facing `registerTool(...)` layer, and tag-scoped collaboration filters across query/tree/list/grep surfaces.
 
 ## Product rule that should stay
 

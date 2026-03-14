@@ -53,6 +53,7 @@ export function registerPluginTools(params: {
           query: { type: "string", description: "Semantic search query" },
           partitions: { type: "array", items: { type: "string" }, description: "Optional partition override" },
           layers: { type: "array", items: { type: "string", enum: ["l0", "l1", "l2"] }, description: "Optional layer override" },
+          tags: { type: "array", items: { type: "string" }, description: "Optional collaboration tag filter" },
           limit: { type: "number", description: "Optional max hits" },
           rerank: { type: "boolean", description: "Enable rerank" },
         },
@@ -66,6 +67,7 @@ export function registerPluginTools(params: {
           query,
           partitions: normalizePartitions(params.partitions, config.recall.preAnswer.partitions),
           layers: normalizeLayers(params.layers, config.recall.preAnswer.layers),
+          tags: normalizeStringArray(params.tags),
           limit: normalizeLimit(params.limit, config.recall.preAnswer.limit),
           rerank: typeof params.rerank === "boolean" ? params.rerank : config.recall.preAnswer.rerank,
         });
@@ -119,6 +121,7 @@ export function registerPluginTools(params: {
         properties: {
           partitions: { type: "array", items: { type: "string" }, description: "Optional partition override" },
           layers: { type: "array", items: { type: "string", enum: ["l0", "l1", "l2"] }, description: "Optional layer override" },
+          tags: { type: "array", items: { type: "string" }, description: "Optional collaboration tag filter" },
           pathPrefix: { type: "string", description: "Optional path prefix such as archive or memory/2026" },
           limit: { type: "number", description: "Optional max nodes" },
         },
@@ -128,6 +131,7 @@ export function registerPluginTools(params: {
           tenantId: config.tenantId,
           partitions: normalizePartitions(params.partitions, config.recall.preAnswer.partitions),
           layers: normalizeLayers(params.layers, ["l0", "l1", "l2"]),
+          tags: normalizeStringArray(params.tags),
           pathPrefix: typeof params.pathPrefix === "string" ? params.pathPrefix : undefined,
           limit: normalizeLimit(params.limit, 50),
         });
@@ -199,6 +203,7 @@ export function registerPluginTools(params: {
           pattern: { type: "string", description: "Text or regex pattern" },
           partitions: { type: "array", items: { type: "string" }, description: "Optional partition override" },
           layers: { type: "array", items: { type: "string", enum: ["l0", "l1", "l2"] }, description: "Optional layer override" },
+          tags: { type: "array", items: { type: "string" }, description: "Optional collaboration tag filter" },
           limit: { type: "number", description: "Optional max matches" },
           regex: { type: "boolean", description: "Interpret pattern as regex" },
           caseSensitive: { type: "boolean", description: "Case-sensitive search" },
@@ -213,6 +218,7 @@ export function registerPluginTools(params: {
           pattern,
           partitions: normalizePartitions(params.partitions, config.recall.preAnswer.partitions),
           layers: normalizeLayers(params.layers, ["l0", "l1", "l2"]),
+          tags: normalizeStringArray(params.tags),
           limit: normalizeLimit(params.limit, 20),
           regex: Boolean(params.regex),
           caseSensitive: Boolean(params.caseSensitive),

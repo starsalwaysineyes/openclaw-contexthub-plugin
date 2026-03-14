@@ -46,6 +46,7 @@ export interface QueryRequest {
   query: string;
   partitions: string[];
   layers: RecallLayer[];
+  tags?: string[];
   limit: number;
   rerank: boolean;
 }
@@ -55,6 +56,7 @@ export interface BrowseTreeRequest {
   partitions: string[];
   types?: string[];
   layers: RecallLayer[];
+  tags?: string[];
   sourceKind?: string;
   pathPrefix?: string;
   limit?: number;
@@ -78,6 +80,7 @@ export interface GrepRequest {
   pattern: string;
   partitions: string[];
   layers: RecallLayer[];
+  tags?: string[];
   limit: number;
   regex?: boolean;
   caseSensitive?: boolean;

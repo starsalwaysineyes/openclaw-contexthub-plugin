@@ -122,12 +122,13 @@ function parseQueryArgs(
   query: string;
   partitions: string[];
   layers: RecallLayer[];
+  tags: string[];
   limit: number;
   rerank: boolean;
   json: boolean;
 } {
   const rawInput = args?.trim() || "";
-  if (!rawInput) throw new Error("usage: /contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank] [--json]");
+  if (!rawInput) throw new Error("usage: /contexthub-query <query> [:: partitions] [:: layers] [:: tags] [:: limit] [:: rerank] [--json]");
   const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
   const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
   const parts = input.split("::").map((item) => item.trim());
@@ -140,12 +141,15 @@ function parseQueryArgs(
   const layers = parts[2]
     ? parts[2].split(",").map((item) => item.trim().toLowerCase()).filter(Boolean) as RecallLayer[]
     : defaults.layers;
-  const limit = parts[3] ? Number(parts[3]) : defaults.limit;
-  const rerank = parts[4]
-    ? ["1", "true", "yes", "on", "rerank"].includes(parts[4].toLowerCase())
+  const tags = parts[3]
+    ? parts[3].split(",").map((item) => item.trim()).filter(Boolean)
+    : [];
+  const limit = parts[4] ? Number(parts[4]) : defaults.limit;
+  const rerank = parts[5]
+    ? ["1", "true", "yes", "on", "rerank"].includes(parts[5].toLowerCase())
     : defaults.rerank;
 
-  return { query, partitions, layers, limit, rerank, json };
+  return { query, partitions, layers, tags, limit, rerank, json };
 }
 
 function parseUploadLastSessionArgs(args: string | undefined, defaultPartitionKey?: string): {
@@ -194,6 +198,7 @@ function parseTreeArgs(
 ): {
   partitions: string[];
   layers: RecallLayer[];
+  tags: string[];
   pathPrefix?: string;
   limit: number;
   json: boolean;
@@ -205,8 +210,9 @@ function parseTreeArgs(
   return {
     partitions: parts[0] ? parts[0].split(",").map((item) => item.trim()).filter(Boolean) : defaults.partitions,
     layers: parts[1] ? parts[1].split(",").map((item) => item.trim().toLowerCase()).filter(Boolean) as RecallLayer[] : defaults.layers,
-    pathPrefix: parts[2] || undefined,
-    limit: parts[3] ? Number(parts[3]) : defaults.limit,
+    tags: parts[2] ? parts[2].split(",").map((item) => item.trim()).filter(Boolean) : [],
+    pathPrefix: parts[3] || undefined,
+    limit: parts[4] ? Number(parts[4]) : defaults.limit,
     json,
   };
 }
@@ -217,6 +223,7 @@ function parseListArgs(
 ): {
   partitions: string[];
   layers: RecallLayer[];
+  tags: string[];
   titleContains?: string;
   sourcePathPrefix?: string;
   limit: number;
@@ -229,9 +236,10 @@ function parseListArgs(
   return {
     partitions: parts[0] ? parts[0].split(",").map((item) => item.trim()).filter(Boolean) : defaults.partitions,
     layers: parts[1] ? parts[1].split(",").map((item) => item.trim().toLowerCase()).filter(Boolean) as RecallLayer[] : defaults.layers,
-    titleContains: parts[2] || undefined,
-    sourcePathPrefix: parts[3] || undefined,
-    limit: parts[4] ? Number(parts[4]) : defaults.limit,
+    tags: parts[2] ? parts[2].split(",").map((item) => item.trim()).filter(Boolean) : [],
+    titleContains: parts[3] || undefined,
+    sourcePathPrefix: parts[4] || undefined,
+    limit: parts[5] ? Number(parts[5]) : defaults.limit,
     json,
   };
 }
@@ -243,13 +251,14 @@ function parseGrepArgs(
   pattern: string;
   partitions: string[];
   layers: RecallLayer[];
+  tags: string[];
   limit: number;
   regex: boolean;
   caseSensitive: boolean;
   json: boolean;
 } {
   const rawInput = args?.trim() || "";
-  if (!rawInput) throw new Error("usage: /contexthub-grep <pattern> [:: partitions] [:: layers] [:: limit] [:: regex] [:: caseSensitive] [--json]");
+  if (!rawInput) throw new Error("usage: /contexthub-grep <pattern> [:: partitions] [:: layers] [:: tags] [:: limit] [:: regex] [:: caseSensitive] [--json]");
   const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
   const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
   const parts = input.split("::").map((item) => item.trim());
@@ -259,9 +268,10 @@ function parseGrepArgs(
     pattern,
     partitions: parts[1] ? parts[1].split(",").map((item) => item.trim()).filter(Boolean) : defaults.partitions,
     layers: parts[2] ? parts[2].split(",").map((item) => item.trim().toLowerCase()).filter(Boolean) as RecallLayer[] : defaults.layers,
-    limit: parts[3] ? Number(parts[3]) : defaults.limit,
-    regex: parts[4] ? ["1", "true", "yes", "on", "regex"].includes(parts[4].toLowerCase()) : false,
-    caseSensitive: parts[5] ? ["1", "true", "yes", "on", "case", "sensitive"].includes(parts[5].toLowerCase()) : false,
+    tags: parts[3] ? parts[3].split(",").map((item) => item.trim()).filter(Boolean) : [],
+    limit: parts[4] ? Number(parts[4]) : defaults.limit,
+    regex: parts[5] ? ["1", "true", "yes", "on", "regex"].includes(parts[5].toLowerCase()) : false,
+    caseSensitive: parts[6] ? ["1", "true", "yes", "on", "case", "sensitive"].includes(parts[6].toLowerCase()) : false,
     json,
   };
 }
@@ -276,7 +286,7 @@ function textReply(text: string, isError = false) {
 }
 
 function formatQuerySummary(payload: {
-  query: { query: string; partitions: string[]; layers: RecallLayer[]; limit: number; rerank: boolean };
+  query: { query: string; partitions: string[]; layers: RecallLayer[]; tags?: string[]; limit: number; rerank: boolean };
   result: { items?: Array<Record<string, any>>; retrieval?: Record<string, any> };
 }): string {
   const items = payload.result.items ?? [];
@@ -300,7 +310,7 @@ function formatQuerySummary(payload: {
 
   const lines = [
     `query: ${payload.query.query}`,
-    `scope: partitions=${payload.query.partitions.join(",") || "(all readable)"} layers=${payload.query.layers.join(",")}`,
+    `scope: partitions=${payload.query.partitions.join(",") || "(all readable)"} layers=${payload.query.layers.join(",")} tags=${payload.query.tags?.join(",") || "-"}`,
     `retrieval: uniqueRecords=${grouped.size} rawHits=${items.length} embeddings=${Boolean(retrieval.usedEmbeddings)} rerank=${Boolean(retrieval.usedRerank)} candidates=${retrieval.candidateCount ?? "?"}`,
   ];
   for (const [index, entry] of unique.entries()) {
@@ -420,10 +430,10 @@ function formatLinksSummary(payload: { items?: Array<Record<string, any>> }): st
 function formatCtxHelp(): string {
   return [
     "ctx commands:",
-    "- /ctx q <query> [:: partitions] [:: layers] [:: limit] [:: rerank] [--json]",
-    "- /ctx g <pattern> [:: partitions] [:: layers] [:: limit] [:: regex] [:: caseSensitive] [--json]",
-    "- /ctx t [:: partitions] [:: layers] [:: pathPrefix] [:: limit] [--json]",
-    "- /ctx ls [:: partitions] [:: layers] [:: titleContains] [:: sourcePathPrefix] [:: limit] [--json]",
+    "- /ctx q <query> [:: partitions] [:: layers] [:: tags] [:: limit] [:: rerank] [--json]",
+    "- /ctx g <pattern> [:: partitions] [:: layers] [:: tags] [:: limit] [:: regex] [:: caseSensitive] [--json]",
+    "- /ctx t [:: partitions] [:: layers] [:: tags] [:: pathPrefix] [:: limit] [--json]",
+    "- /ctx ls [:: partitions] [:: layers] [:: tags] [:: titleContains] [:: sourcePathPrefix] [:: limit] [--json]",
     "- /ctx r <recordId> [:: fromLine] [:: limit] [--json]",
     "- /ctx p",
     "- /ctx s <layer> <partitionKey|-> <title> :: <text>",
@@ -468,6 +478,7 @@ export function registerPluginCommands(params: {
               query: parsed.query,
               partitions: parsed.partitions,
               layers: parsed.layers,
+              tags: parsed.tags,
               limit: parsed.limit,
               rerank: parsed.rerank,
             });
@@ -484,6 +495,7 @@ export function registerPluginCommands(params: {
               pattern: parsed.pattern,
               partitions: parsed.partitions,
               layers: parsed.layers,
+              tags: parsed.tags,
               limit: parsed.limit,
               regex: parsed.regex,
               caseSensitive: parsed.caseSensitive,
@@ -500,6 +512,7 @@ export function registerPluginCommands(params: {
               tenantId: config.tenantId,
               partitions: parsed.partitions,
               layers: parsed.layers,
+              tags: parsed.tags,
               pathPrefix: parsed.pathPrefix,
               limit: parsed.limit,
             });
@@ -515,6 +528,7 @@ export function registerPluginCommands(params: {
               tenantId: config.tenantId,
               partitions: parsed.partitions,
               layers: parsed.layers,
+              tags: parsed.tags,
               titleContains: parsed.titleContains,
               sourcePathPrefix: parsed.sourcePathPrefix,
               limit: parsed.limit,
@@ -653,7 +667,7 @@ export function registerPluginCommands(params: {
 
   api.registerCommand({
     name: "contexthub-query",
-    description: "Query ContextHub explicitly: /contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank]",
+    description: "Query ContextHub explicitly: /contexthub-query <query> [:: partitions] [:: layers] [:: tags] [:: limit] [:: rerank]",
     acceptsArgs: true,
     requireAuth: true,
     handler: async (ctx: PluginCommandContext) => {
@@ -669,6 +683,7 @@ export function registerPluginCommands(params: {
           query: parsed.query,
           partitions: parsed.partitions,
           layers: parsed.layers,
+          tags: parsed.tags,
           limit: parsed.limit,
           rerank: parsed.rerank,
         });
@@ -718,7 +733,7 @@ export function registerPluginCommands(params: {
 
   api.registerCommand({
     name: "contexthub-grep",
-    description: "Search record text with line numbers: /contexthub-grep <pattern> [:: partitions] [:: layers] [:: limit] [:: regex] [:: caseSensitive] [--json]",
+    description: "Search record text with line numbers: /contexthub-grep <pattern> [:: partitions] [:: layers] [:: tags] [:: limit] [:: regex] [:: caseSensitive] [--json]",
     acceptsArgs: true,
     requireAuth: true,
     handler: async (ctx: PluginCommandContext) => {
@@ -733,6 +748,7 @@ export function registerPluginCommands(params: {
           pattern: parsed.pattern,
           partitions: parsed.partitions,
           layers: parsed.layers,
+          tags: parsed.tags,
           limit: parsed.limit,
           regex: parsed.regex,
           caseSensitive: parsed.caseSensitive,

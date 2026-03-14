@@ -1,4 +1,5 @@
 import { ContextHubHttpClient } from "./contexthub.js";
+import { runImportPreset } from "./importer.js";
 import { buildImportFilePayload, buildSaveTextPayload } from "./payloads.js";
 import type { ContextHubPluginConfig, RecallLayer } from "./types.js";
 
@@ -218,5 +219,96 @@ export function registerPluginTools(params: {
       },
     },
     { optional: true },
+  );
+
+  api.registerTool(
+    {
+      name: "ctx_import_preset",
+      description: "Run one configured local import preset against ContextHub. Useful for migration batches that should follow a known preset.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          presetName: { type: "string", description: "Configured preset name" },
+          limit: { type: "number", description: "Optional override for max files" },
+          dryRun: { type: "boolean", description: "When true, only preview payloads" },
+        },
+        required: ["presetName"],
+      },
+      async execute(_toolCallId: string, params: Record<string, unknown>) {
+        const presetName = String(params.presetName ?? "").trim();
+        if (!presetName) throw new Error("presetName is required");
+        const result = await runImportPreset({
+          client,
+          config,
+          presetName,
+          overrideLimit: params.limit == null ? undefined : normalizeLimit(params.limit, 1),
+          dryRun: Boolean(params.dryRun),
+        });
+        const lines = [
+          `preset: ${result.preset}`,
+          `count: ${result.count}`,
+          `dryRun: ${Boolean(result.dryRun)}`,
+        ];
+        for (const [index, item] of result.results.slice(0, 5).entries()) {
+          lines.push(`${index + 1}. ${(item as any).path} -> ${(item as any).layer ?? "?"} (${(item as any).derivationStatus ?? (result.dryRun ? "dry-run" : "unknown")})`);
+        }
+        return content(lines.join("\n"), { result });
+      },
+    },
+    { optional: true },
+  );
+
+  api.registerTool(
+    {
+      name: "ctx_job",
+      description: "Inspect one ContextHub derivation job by ID.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          jobId: { type: "string", description: "Derivation job ID" },
+        },
+        required: ["jobId"],
+      },
+      async execute(_toolCallId: string, params: Record<string, unknown>) {
+        const jobId = String(params.jobId ?? "").trim();
+        if (!jobId) throw new Error("jobId is required");
+        const result = await client.getDerivationJob(jobId);
+        const lines = [
+          `job: ${result.id}`,
+          `status: ${result.status}`,
+          `mode: ${result.mode ?? "-"}${result.effectiveMode ? ` -> ${result.effectiveMode}` : ""}`,
+          `sourceRecordId: ${result.sourceRecordId ?? "-"}`,
+          `error: ${result.errorMessage ?? "-"}`,
+        ];
+        return content(lines.join("\n"), { result });
+      },
+    },
+  );
+
+  api.registerTool(
+    {
+      name: "ctx_links",
+      description: "Inspect record links emitted by derivation or import lineage.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          recordId: { type: "string", description: "Record ID" },
+        },
+        required: ["recordId"],
+      },
+      async execute(_toolCallId: string, params: Record<string, unknown>) {
+        const recordId = String(params.recordId ?? "").trim();
+        if (!recordId) throw new Error("recordId is required");
+        const result = await client.listRecordLinks(recordId);
+        const lines = [`links: ${result.items.length}`];
+        for (const [index, item] of result.items.slice(0, 8).entries()) {
+          lines.push(`${index + 1}. ${item.relation} ${item.sourceRecordId} -> ${item.targetRecordId}`);
+        }
+        return content(lines.join("\n"), { result });
+      },
+    },
   );
 }

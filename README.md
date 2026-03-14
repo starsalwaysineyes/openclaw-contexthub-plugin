@@ -56,6 +56,9 @@ Implemented in this repo now:
   - `ctx_grep`
   - `ctx_write_text` (optional)
   - `ctx_import_file` (optional)
+  - `ctx_import_preset` (optional)
+  - `ctx_job`
+  - `ctx_links`
 - preferred short operator entrypoint:
   - `/ctx q ...`
   - `/ctx g ...`

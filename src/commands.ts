@@ -100,6 +100,41 @@ function parseImportPresetArgs(args: string | undefined): { presetName: string; 
   };
 }
 
+function parseQueryArgs(
+  args: string | undefined,
+  defaults: {
+    partitions: string[];
+    layers: RecallLayer[];
+    limit: number;
+    rerank: boolean;
+  },
+): {
+  query: string;
+  partitions: string[];
+  layers: RecallLayer[];
+  limit: number;
+  rerank: boolean;
+} {
+  const input = args?.trim() || "";
+  if (!input) throw new Error("usage: /contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank]");
+  const parts = input.split("::").map((item) => item.trim());
+  const query = parts[0];
+  if (!query) throw new Error("query is required");
+
+  const partitions = parts[1]
+    ? parts[1].split(",").map((item) => item.trim()).filter(Boolean)
+    : defaults.partitions;
+  const layers = parts[2]
+    ? parts[2].split(",").map((item) => item.trim().toLowerCase()).filter(Boolean) as RecallLayer[]
+    : defaults.layers;
+  const limit = parts[3] ? Number(parts[3]) : defaults.limit;
+  const rerank = parts[4]
+    ? ["1", "true", "yes", "on", "rerank"].includes(parts[4].toLowerCase())
+    : defaults.rerank;
+
+  return { query, partitions, layers, limit, rerank };
+}
+
 function textReply(text: string, isError = false) {
   return { text, isError };
 }
@@ -124,6 +159,44 @@ export function registerPluginCommands(params: {
       limit: config.recall.preAnswer.limit,
       rerank: config.recall.preAnswer.rerank,
     }, null, 2)),
+  });
+
+  api.registerCommand({
+    name: "contexthub-query",
+    description: "Query ContextHub explicitly: /contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank]",
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: async (ctx: PluginCommandContext) => {
+      try {
+        const parsed = parseQueryArgs(ctx.args, {
+          partitions: config.recall.preAnswer.partitions,
+          layers: config.recall.preAnswer.layers,
+          limit: config.recall.preAnswer.limit,
+          rerank: config.recall.preAnswer.rerank,
+        });
+        const result = await client.query({
+          tenantId: config.tenantId,
+          query: parsed.query,
+          partitions: parsed.partitions,
+          layers: parsed.layers,
+          limit: parsed.limit,
+          rerank: parsed.rerank,
+        });
+        return textReply(JSON.stringify({ query: parsed, result }, null, 2));
+      } catch (error) {
+        return textReply(String(error), true);
+      }
+    },
+  });
+
+  api.registerCommand({
+    name: "contexthub-presets",
+    description: "List configured ContextHub import presets",
+    acceptsArgs: false,
+    requireAuth: true,
+    handler: async () => {
+      return textReply(JSON.stringify({ importPresets: config.importPresets }, null, 2));
+    },
   });
 
   api.registerCommand({

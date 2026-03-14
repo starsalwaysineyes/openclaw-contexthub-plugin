@@ -47,6 +47,8 @@ Implemented in this repo now:
 - config resolution from plugin config + env
 - plugin commands:
   - `/contexthub-recall`
+  - `/contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank]`
+  - `/contexthub-presets`
   - `/contexthub-save <layer> <partitionKey|-> <title> :: <text>`
   - `/contexthub-commit <partitionKey|-> <summary> [:: memoryTitle :: memoryText]`
   - `/contexthub-import-file <layer> <partitionKey|-> <filePath> [:: title]`
@@ -120,7 +122,7 @@ An agent needs four practical abilities:
 3. import local docs/files when a human points at them
 4. inspect async jobs and links when something looks wrong
 
-This repo now covers all four at a first-pass level, plus a first-pass preset-based batch import flow.
+This repo now covers all four at a first-pass level, plus a first-pass preset-based batch import flow and an explicit operator-facing query command.
 
 ## Product rule that should stay
 

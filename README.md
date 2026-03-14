@@ -8,6 +8,7 @@ Current focus:
 
 - cfg-driven pre-answer recall
 - default recall scope = `L0` only
+- cfg-driven automatic post-task commit (disabled by default)
 - keep backend semantics generic (`L0` / `L1` / `L2` are explicit targets)
 - treat local archive/daily-memory behavior as migration presets, not product rules
 
@@ -25,6 +26,7 @@ Current focus:
 - save explicit text to `L0` / `L1` / `L2`
 - commit curated session summaries
 - write durable records for decisions, lessons, gotchas
+- optionally auto-commit final assistant output after successful agent runs
 
 ### Upload / Import
 
@@ -43,6 +45,7 @@ Current focus:
 Implemented in this repo now:
 
 - minimal `before_agent_start` hook
+- cfg-driven `agent_end -> commitSession` hook
 - ContextHub HTTP client for `query`, `importResource`, `commitSession`, `getDerivationJob`, `listRecordLinks`
 - config resolution from plugin config + env
 - plugin commands:
@@ -59,10 +62,10 @@ Implemented in this repo now:
 
 Not implemented yet:
 
-- automatic post-task session commit
 - operator-friendly explain-recall output
 - true file/blob upload once backend supports non-inline payloads
 - richer preset lifecycle and validation UX
+- stronger summarization policy for automatic post-task commit
 
 ## Config shape
 
@@ -78,6 +81,15 @@ Not implemented yet:
       "layers": ["l0"],
       "limit": 5,
       "rerank": false
+    }
+  },
+  "commit": {
+    "afterAgentEnd": {
+      "enabled": false,
+      "partitionKey": "project-contexthub",
+      "writeMemory": false,
+      "memoryLayer": "l0",
+      "maxSummaryChars": 1200
     }
   },
   "importPresets": {
@@ -112,6 +124,11 @@ Key env vars:
 - `CONTEXT_HUB_RECALL_LAYERS`
 - `CONTEXT_HUB_RECALL_LIMIT`
 - `CONTEXT_HUB_RECALL_RERANK`
+- `CONTEXT_HUB_COMMIT_AFTER_AGENT_END_ENABLED`
+- `CONTEXT_HUB_COMMIT_AFTER_AGENT_END_PARTITION_KEY`
+- `CONTEXT_HUB_COMMIT_AFTER_AGENT_END_WRITE_MEMORY`
+- `CONTEXT_HUB_COMMIT_AFTER_AGENT_END_MEMORY_LAYER`
+- `CONTEXT_HUB_COMMIT_AFTER_AGENT_END_MAX_SUMMARY_CHARS`
 
 ## Agent workflow view
 
@@ -122,7 +139,7 @@ An agent needs four practical abilities:
 3. import local docs/files when a human points at them
 4. inspect async jobs and links when something looks wrong
 
-This repo now covers all four at a first-pass level, plus a first-pass preset-based batch import flow and an explicit operator-facing query command.
+This repo now covers all four at a first-pass level, plus preset-based batch import flow and automatic post-task commit hooks.
 
 ## Product rule that should stay
 

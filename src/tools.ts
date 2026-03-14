@@ -72,7 +72,6 @@ export function registerPluginTools(params: {
         return content(lines.join("\n"), { result });
       },
     },
-    { name: "ctx_query" },
   );
 
   api.registerTool(
@@ -102,7 +101,6 @@ export function registerPluginTools(params: {
         return content(lines.join("\n"), { result });
       },
     },
-    { name: "ctx_read" },
   );
 
   api.registerTool(
@@ -145,7 +143,6 @@ export function registerPluginTools(params: {
         return content(lines.join("\n"), { result });
       },
     },
-    { name: "ctx_grep" },
   );
 
   api.registerTool(
@@ -184,7 +181,7 @@ export function registerPluginTools(params: {
         return content(`saved [${result.record.layer}] ${result.record.title} (${result.record.id})`, { result });
       },
     },
-    { name: "ctx_write_text", optional: true },
+    { optional: true },
   );
 
   api.registerTool(
@@ -220,6 +217,6 @@ export function registerPluginTools(params: {
         return content(`imported [${result.record.layer}] ${result.record.title} (${result.record.id})`, { result });
       },
     },
-    { name: "ctx_import_file", optional: true },
+    { optional: true },
   );
 }

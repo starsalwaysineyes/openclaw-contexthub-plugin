@@ -1,5 +1,7 @@
 # openclaw-contexthub-plugin
 
+Official plugin maintained by MemTensor.
+
 OpenClaw plugin skeleton for ContextHub.
 
 Current focus:

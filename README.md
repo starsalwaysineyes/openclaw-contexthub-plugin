@@ -48,16 +48,19 @@ Implemented in this repo now:
 - plugin commands:
   - `/contexthub-recall`
   - `/contexthub-save <layer> <partitionKey|-> <title> :: <text>`
+  - `/contexthub-commit <partitionKey|-> <summary> [:: memoryTitle :: memoryText]`
   - `/contexthub-import-file <layer> <partitionKey|-> <filePath> [:: title]`
+  - `/contexthub-import-preset <presetName> [limit] [--dry-run]`
   - `/contexthub-job <jobId>`
   - `/contexthub-links <recordId>`
+- GitHub Actions CI: `npm ci` + `npm run check`
 
 Not implemented yet:
 
 - automatic post-task session commit
-- batch import preset commands
 - operator-friendly explain-recall output
 - true file/blob upload once backend supports non-inline payloads
+- richer preset lifecycle and validation UX
 
 ## Config shape
 
@@ -74,6 +77,16 @@ Not implemented yet:
       "limit": 5,
       "rerank": false
     }
+  },
+  "importPresets": {
+    "archive-to-l1": {
+      "rootPath": "/Users/me/archive",
+      "partitionKey": "project-contexthub",
+      "layer": "l1",
+      "deriveLayers": ["l0"],
+      "deriveMode": "async",
+      "tags": ["archive", "migration"]
+    }
   }
 }
 ```
@@ -82,6 +95,8 @@ Not implemented yet:
 
 ```bash
 cp .env.example .env
+npm ci
+npm run check
 ```
 
 Key env vars:
@@ -105,7 +120,7 @@ An agent needs four practical abilities:
 3. import local docs/files when a human points at them
 4. inspect async jobs and links when something looks wrong
 
-This skeleton now covers all four at a first-pass level.
+This repo now covers all four at a first-pass level, plus a first-pass preset-based batch import flow.
 
 ## Product rule that should stay
 

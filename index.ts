@@ -18,21 +18,18 @@ const pluginConfigSchema = {
           type: "object" as const,
           properties: {
             enabled: { type: "boolean" as const, description: "Enable pre-answer recall" },
-            partitions: {
-              type: "array" as const,
-              items: { type: "string" as const },
-              description: "Default partitions used by pre-answer recall",
-            },
-            layers: {
-              type: "array" as const,
-              items: { type: "string" as const },
-              description: "Layers queried by pre-answer recall (default: l0 only)",
-            },
+            partitions: { type: "array" as const, items: { type: "string" as const }, description: "Default partitions used by pre-answer recall" },
+            layers: { type: "array" as const, items: { type: "string" as const }, description: "Layers queried by pre-answer recall (default: l0 only)" },
             limit: { type: "number" as const, description: "Max recall hits for one turn" },
             rerank: { type: "boolean" as const, description: "Enable rerank on recall" },
           },
         },
       },
+    },
+    importPresets: {
+      type: "object" as const,
+      additionalProperties: true,
+      description: "Optional local migration presets keyed by preset name",
     },
   },
 };
@@ -57,10 +54,7 @@ const plugin = {
   configSchema: pluginConfigSchema,
   register(api: OpenClawPluginApi) {
     const config = resolveConfig((api.pluginConfig ?? {}) as Record<string, unknown>);
-    const client = new ContextHubHttpClient({
-      baseUrl: config.baseUrl,
-      token: config.token,
-    });
+    const client = new ContextHubHttpClient({ baseUrl: config.baseUrl, token: config.token });
 
     registerPluginCommands({ api, config, client });
 

@@ -21,7 +21,8 @@
     "installDependencies": true
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit"
   },
   "engines": {
     "node": ">=18.0.0"

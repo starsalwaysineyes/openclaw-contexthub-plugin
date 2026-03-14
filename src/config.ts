@@ -1,4 +1,4 @@
-import type { ContextHubPluginConfig, RecallLayer } from "./types.js";
+import type { ContextHubPluginConfig, DeriveMode, ImportPreset, RecallLayer } from "./types.js";
 
 function parseCsv(value: string | undefined, fallback: string[]): string[] {
   if (!value) return fallback;
@@ -15,6 +15,37 @@ function parseBool(value: string | undefined, fallback: boolean): boolean {
 
 function parseLayers(value: string | undefined, fallback: RecallLayer[]): RecallLayer[] {
   return parseCsv(value, fallback).map((item) => item.toLowerCase() as RecallLayer);
+}
+
+function parseDeriveMode(value: string | undefined, fallback: DeriveMode): DeriveMode {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "sync" || normalized === "async" ? normalized : fallback;
+}
+
+function normalizePreset(input: Record<string, any> | undefined): ImportPreset | null {
+  if (!input) return null;
+  const rootPath = String(input.rootPath ?? "").trim();
+  const partitionKey = String(input.partitionKey ?? "").trim();
+  const layer = String(input.layer ?? "").trim().toLowerCase() as RecallLayer;
+  if (!rootPath || !partitionKey || !["l0", "l1", "l2"].includes(layer)) return null;
+  return {
+    rootPath,
+    partitionKey,
+    layer,
+    deriveLayers: parseLayers(input.deriveLayers?.join?.(",") ?? input.deriveLayers, []),
+    deriveMode: parseDeriveMode(input.deriveMode, "async"),
+    limit: input.limit == null ? undefined : Number(input.limit),
+    tags: Array.isArray(input.tags) ? input.tags.map((item) => String(item)) : parseCsv(input.tags, []),
+  };
+}
+
+function resolveImportPresets(raw: Record<string, any> | undefined): Record<string, ImportPreset> {
+  const presets: Record<string, ImportPreset> = {};
+  for (const [name, value] of Object.entries(raw ?? {})) {
+    const preset = normalizePreset(value as Record<string, any>);
+    if (preset) presets[name] = preset;
+  }
+  return presets;
 }
 
 export function resolveConfig(raw: Record<string, unknown> | undefined): ContextHubPluginConfig {
@@ -36,5 +67,6 @@ export function resolveConfig(raw: Record<string, unknown> | undefined): Context
         rerank: Boolean(preAnswer.rerank ?? parseBool(process.env.CONTEXT_HUB_RECALL_RERANK, false)),
       },
     },
+    importPresets: resolveImportPresets(cfg.importPresets),
   };
 }

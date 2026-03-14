@@ -1,4 +1,5 @@
 export type RecallLayer = "l0" | "l1" | "l2";
+export type DeriveMode = "sync" | "async";
 
 export interface PreAnswerRecallConfig {
   enabled: boolean;
@@ -6,6 +7,16 @@ export interface PreAnswerRecallConfig {
   layers: RecallLayer[];
   limit: number;
   rerank: boolean;
+}
+
+export interface ImportPreset {
+  rootPath: string;
+  partitionKey: string;
+  layer: RecallLayer;
+  deriveLayers: RecallLayer[];
+  deriveMode: DeriveMode;
+  limit?: number;
+  tags: string[];
 }
 
 export interface ContextHubPluginConfig {
@@ -16,6 +27,7 @@ export interface ContextHubPluginConfig {
   recall: {
     preAnswer: PreAnswerRecallConfig;
   };
+  importPresets: Record<string, ImportPreset>;
 }
 
 export interface QueryRequest {

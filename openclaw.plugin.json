@@ -40,7 +40,12 @@
             "deriveLayers": { "type": "array", "items": { "type": "string", "enum": ["l0", "l1", "l2"] } },
             "deriveMode": { "type": "string", "enum": ["sync", "async"] },
             "limit": { "type": "number" },
-            "tags": { "type": "array", "items": { "type": "string" } }
+            "tags": { "type": "array", "items": { "type": "string" } },
+            "recordType": { "type": "string" },
+            "sourceKind": { "type": "string" },
+            "relativePathPrefix": { "type": "string" },
+            "promptPreset": { "type": "string" },
+            "metadata": { "type": "object", "additionalProperties": true }
           }
         }
       }

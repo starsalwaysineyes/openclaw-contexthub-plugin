@@ -36,6 +36,11 @@ function normalizePreset(input: Record<string, any> | undefined): ImportPreset |
     deriveMode: parseDeriveMode(input.deriveMode, "async"),
     limit: input.limit == null ? undefined : Number(input.limit),
     tags: Array.isArray(input.tags) ? input.tags.map((item) => String(item)) : parseCsv(input.tags, []),
+    recordType: input.recordType == null ? undefined : String(input.recordType).trim() || undefined,
+    sourceKind: input.sourceKind == null ? undefined : String(input.sourceKind).trim() || undefined,
+    relativePathPrefix: input.relativePathPrefix == null ? undefined : String(input.relativePathPrefix).trim() || undefined,
+    promptPreset: input.promptPreset == null ? undefined : String(input.promptPreset).trim() || undefined,
+    metadata: input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata) ? input.metadata : undefined,
   };
 }
 

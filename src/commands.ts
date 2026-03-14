@@ -573,7 +573,8 @@ export function registerPluginCommands(params: {
               const lines = ["importPresets:"];
               for (const name of presetNames) {
                 const preset = config.importPresets[name];
-                lines.push(`- ${name}: ${preset.rootPath} -> ${preset.partitionKey}/${preset.layer}`);
+                const pathPrefix = preset.relativePathPrefix ? ` path=${preset.relativePathPrefix}` : "";
+                lines.push(`- ${name}: ${preset.rootPath} -> ${preset.partitionKey}/${preset.layer}${pathPrefix}`);
               }
               return lines.join("\n");
             })());
@@ -733,7 +734,8 @@ export function registerPluginCommands(params: {
       const lines = ["importPresets:"];
       for (const name of presetNames) {
         const preset = config.importPresets[name];
-        lines.push(`- ${name}: ${preset.rootPath} -> ${preset.partitionKey}/${preset.layer}`);
+        const pathPrefix = preset.relativePathPrefix ? ` path=${preset.relativePathPrefix}` : "";
+        lines.push(`- ${name}: ${preset.rootPath} -> ${preset.partitionKey}/${preset.layer}${pathPrefix}`);
       }
       return textReply(lines.join("\n"));
     },

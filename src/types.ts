@@ -17,6 +17,11 @@ export interface ImportPreset {
   deriveMode: DeriveMode;
   limit?: number;
   tags: string[];
+  recordType?: string;
+  sourceKind?: string;
+  relativePathPrefix?: string;
+  promptPreset?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface LastSessionCapture {

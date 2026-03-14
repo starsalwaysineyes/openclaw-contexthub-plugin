@@ -121,6 +121,11 @@ Not implemented yet:
       "layer": "l1",
       "deriveLayers": ["l0"],
       "deriveMode": "async",
+      "recordType": "summary",
+      "sourceKind": "local_file",
+      "relativePathPrefix": "archive",
+      "promptPreset": "archive_and_memory",
+      "metadata": { "migrationPreset": "archive" },
       "tags": ["archive", "migration"]
     }
   }
@@ -156,7 +161,7 @@ An agent needs four practical abilities:
 3. upload raw session/doc/file content when a human wants raw retrieval
 4. inspect async jobs and links when something looks wrong
 
-This repo now covers all four at a first-pass level, plus preset-based batch import flow, explicit last-session upload, the first line-oriented read/grep bridge to ContextHub, a shorter `/ctx` operator surface, the first agent-facing `registerTool(...)` layer, and tag-scoped collaboration filters across query/tree/list/grep surfaces.
+This repo now covers all four at a first-pass level, plus preset-based batch import flow, explicit last-session upload, the first line-oriented read/grep bridge to ContextHub, a shorter `/ctx` operator surface, the first agent-facing `registerTool(...)` layer, tag-scoped collaboration filters across query/tree/list/grep surfaces, and richer import presets for migration mapping (`recordType`, `sourceKind`, `relativePathPrefix`, `promptPreset`, `metadata`).
 
 ## Product rule that should stay
 

@@ -41,16 +41,21 @@ Current focus:
 Implemented in this repo now:
 
 - minimal `before_agent_start` hook
-- ContextHub HTTP client for `query`, `importResource`, `commitSession`, `getDerivationJob`
+- ContextHub HTTP client for `query`, `importResource`, `commitSession`, `getDerivationJob`, `listRecordLinks`
 - config resolution from plugin config + env
+- plugin commands:
+  - `/contexthub-recall`
+  - `/contexthub-save <layer> <partitionKey|-> <title> :: <text>`
+  - `/contexthub-import-file <layer> <partitionKey|-> <filePath> [:: title]`
+  - `/contexthub-job <jobId>`
+  - `/contexthub-links <recordId>`
 
 Not implemented yet:
 
-- explicit write commands
-- file upload flow
-- batch import preset command surface
-- operator inspection commands
 - automatic post-task session commit
+- batch import preset commands
+- operator-friendly explain-recall output
+- true file/blob upload once backend supports non-inline payloads
 
 ## Config shape
 
@@ -58,6 +63,7 @@ Not implemented yet:
 {
   "baseUrl": "http://127.0.0.1:4040",
   "tenantId": "tenant_xxx",
+  "defaultPartitionKey": "project-contexthub",
   "recall": {
     "preAnswer": {
       "enabled": true,
@@ -81,11 +87,23 @@ Key env vars:
 - `CONTEXT_HUB_BASE_URL`
 - `CONTEXT_HUB_TOKEN`
 - `CONTEXT_HUB_TENANT_ID`
+- `CONTEXT_HUB_DEFAULT_PARTITION_KEY`
 - `CONTEXT_HUB_RECALL_ENABLED`
 - `CONTEXT_HUB_RECALL_PARTITIONS`
 - `CONTEXT_HUB_RECALL_LAYERS`
 - `CONTEXT_HUB_RECALL_LIMIT`
 - `CONTEXT_HUB_RECALL_RERANK`
+
+## Agent workflow view
+
+An agent needs four practical abilities:
+
+1. recall short pointers before answering (`L0` by default)
+2. save explicit conclusions/decisions to chosen layers
+3. import local docs/files when a human points at them
+4. inspect async jobs and links when something looks wrong
+
+This skeleton now covers all four at a first-pass level.
 
 ## Product rule that should stay
 

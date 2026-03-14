@@ -12,6 +12,7 @@ export interface ContextHubPluginConfig {
   baseUrl: string;
   token?: string;
   tenantId: string;
+  defaultPartitionKey?: string;
   recall: {
     preAnswer: PreAnswerRecallConfig;
   };
@@ -41,4 +42,23 @@ export interface QueryItem {
 export interface QueryResponse {
   items: QueryItem[];
   retrieval?: Record<string, unknown>;
+}
+
+export interface DerivationJob {
+  id: string;
+  status: string;
+  mode?: string;
+  effectiveMode?: string;
+  sourceRecordId?: string;
+  requestedLayers?: string[];
+  errorMessage?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RecordLink {
+  id: string;
+  sourceRecordId: string;
+  targetRecordId: string;
+  relation: string;
+  metadata?: Record<string, unknown>;
 }

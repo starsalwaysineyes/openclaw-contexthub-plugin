@@ -1,4 +1,5 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import { registerPluginCommands } from "./src/commands.js";
 import { ContextHubHttpClient } from "./src/contexthub.js";
 import { resolveConfig } from "./src/config.js";
 
@@ -9,6 +10,7 @@ const pluginConfigSchema = {
     baseUrl: { type: "string" as const, description: "ContextHub base URL" },
     token: { type: "string" as const, description: "Optional bearer token" },
     tenantId: { type: "string" as const, description: "ContextHub tenant ID" },
+    defaultPartitionKey: { type: "string" as const, description: "Default partition key for plugin write/import commands" },
     recall: {
       type: "object" as const,
       properties: {
@@ -50,7 +52,7 @@ function buildPrependContext(items: Array<{ title: string; layer: string; snippe
 const plugin = {
   id: "openclaw-contexthub-plugin",
   name: "OpenClaw ContextHub Plugin",
-  description: "Pre-answer recall and future write/import bridge for ContextHub.",
+  description: "Pre-answer recall plus explicit write/import bridge for ContextHub.",
   kind: "integration" as const,
   configSchema: pluginConfigSchema,
   register(api: OpenClawPluginApi) {
@@ -59,6 +61,8 @@ const plugin = {
       baseUrl: config.baseUrl,
       token: config.token,
     });
+
+    registerPluginCommands({ api, config, client });
 
     api.on("before_agent_start", async (event: { prompt?: string }) => {
       const recall = config.recall.preAnswer;

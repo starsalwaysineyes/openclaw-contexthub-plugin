@@ -26,6 +26,7 @@ export function resolveConfig(raw: Record<string, unknown> | undefined): Context
     baseUrl: String(cfg.baseUrl ?? process.env.CONTEXT_HUB_BASE_URL ?? "http://127.0.0.1:4040"),
     token: String(cfg.token ?? process.env.CONTEXT_HUB_TOKEN ?? "") || undefined,
     tenantId: String(cfg.tenantId ?? process.env.CONTEXT_HUB_TENANT_ID ?? ""),
+    defaultPartitionKey: String(cfg.defaultPartitionKey ?? process.env.CONTEXT_HUB_DEFAULT_PARTITION_KEY ?? "") || undefined,
     recall: {
       preAnswer: {
         enabled: Boolean(preAnswer.enabled ?? parseBool(process.env.CONTEXT_HUB_RECALL_ENABLED, true)),

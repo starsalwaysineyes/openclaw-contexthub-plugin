@@ -24,14 +24,39 @@ function extractRole(message: unknown): string | undefined {
 function extractText(message: unknown): string {
   if (!message || typeof message !== "object") return "";
   const record = message as Record<string, unknown>;
-  const text = flattenText(record.content ?? record.text ?? record.message).join("\n").trim();
+  const role = extractRole(message);
+  let text = flattenText(record.content ?? record.text ?? record.message).join("\n").trim();
+  if (role === "assistant") {
+    text = text
+      .split(/\n+/)
+      .filter((line) => !["thinking", "toolCall", "toolresult"].includes(line.trim()))
+      .filter((line) => !line.includes('"encrypted_content"'))
+      .filter((line) => !line.startsWith('{"id":"rs_'))
+      .filter((line) => !line.startsWith('call_'))
+      .join("\n")
+      .trim();
+  }
   return text.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function visibleTitleFromUserText(text: string): string | null {
+  const lines = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !line.startsWith("## ContextHub recall"))
+    .filter((line) => !line.startsWith("Use these recalled L0 memory pointers"))
+    .filter((line) => !/^\d+\. \[l\d\]/.test(line))
+    .filter((line) => !/^Conversation info/.test(line))
+    .filter((line) => !/^Sender \(untrusted metadata\)/.test(line))
+    .filter((line) => line.toLowerCase() !== "json");
+  return lines[lines.length - 1] || null;
 }
 
 function summarizeTitle(messages: Array<{ role: string; content: string }>): string {
   const lastUser = [...messages].reverse().find((entry) => entry.role === "user");
-  const firstLine = lastUser?.content.split(/\n+/)[0]?.trim();
-  if (firstLine) return firstLine.slice(0, 80);
+  const visible = lastUser ? visibleTitleFromUserText(lastUser.content) : null;
+  if (visible) return visible.slice(0, 80);
   return "OpenClaw session transcript";
 }
 

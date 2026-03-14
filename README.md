@@ -52,7 +52,7 @@ Implemented in this repo now:
 - config resolution from plugin config + env
 - plugin commands:
   - `/contexthub-recall`
-  - `/contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank]`
+  - `/contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank] [--json]`
   - `/contexthub-presets`
   - `/contexthub-last-session`
   - `/contexthub-upload-last-session <partitionKey|-> [:: title]`
@@ -66,10 +66,9 @@ Implemented in this repo now:
 
 Not implemented yet:
 
-- operator-friendly explain-recall output
+- operator-friendly explain-recall output beyond the current compact summary / `--json` split
 - true file/blob upload once backend supports non-inline payloads
 - richer preset lifecycle and validation UX
-- stronger transcript shaping / redaction controls before upload
 - smarter capture rules so `/contexthub-last-session` can optionally track non-chat command flows too
 
 ## Config shape

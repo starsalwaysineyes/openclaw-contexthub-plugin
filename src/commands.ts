@@ -124,9 +124,12 @@ function parseQueryArgs(
   layers: RecallLayer[];
   limit: number;
   rerank: boolean;
+  json: boolean;
 } {
-  const input = args?.trim() || "";
-  if (!input) throw new Error("usage: /contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank]");
+  const rawInput = args?.trim() || "";
+  if (!rawInput) throw new Error("usage: /contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank] [--json]");
+  const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
+  const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
   const parts = input.split("::").map((item) => item.trim());
   const query = parts[0];
   if (!query) throw new Error("query is required");
@@ -142,7 +145,7 @@ function parseQueryArgs(
     ? ["1", "true", "yes", "on", "rerank"].includes(parts[4].toLowerCase())
     : defaults.rerank;
 
-  return { query, partitions, layers, limit, rerank };
+  return { query, partitions, layers, limit, rerank, json };
 }
 
 function parseUploadLastSessionArgs(args: string | undefined, defaultPartitionKey?: string): {
@@ -164,8 +167,89 @@ function parseUploadLastSessionArgs(args: string | undefined, defaultPartitionKe
   };
 }
 
+function truncate(value: string, limit = 220): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length <= limit ? normalized : `${normalized.slice(0, limit - 1)}...`;
+}
+
 function textReply(text: string, isError = false) {
   return { text, isError };
+}
+
+function formatQuerySummary(payload: {
+  query: { query: string; partitions: string[]; layers: RecallLayer[]; limit: number; rerank: boolean };
+  result: { items?: Array<Record<string, any>>; retrieval?: Record<string, any> };
+}): string {
+  const items = payload.result.items ?? [];
+  const retrieval = payload.result.retrieval ?? {};
+  const lines = [
+    `query: ${payload.query.query}`,
+    `scope: partitions=${payload.query.partitions.join(",") || "(all readable)"} layers=${payload.query.layers.join(",")}`,
+    `retrieval: hits=${items.length} embeddings=${Boolean(retrieval.usedEmbeddings)} rerank=${Boolean(retrieval.usedRerank)} candidates=${retrieval.candidateCount ?? "?"}`,
+  ];
+  for (const [index, item] of items.slice(0, 5).entries()) {
+    lines.push(`${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey}) score=${Number(item.score ?? 0).toFixed(3)}`);
+    lines.push(`   ${truncate(String(item.snippet ?? ""), 180)}`);
+  }
+  return lines.join("\n");
+}
+
+function formatSaveSummary(result: any): string {
+  return [
+    `saved: [${result.record.layer}] ${result.record.title}`,
+    `recordId: ${result.record.id}`,
+    `partition: ${result.record.partitionKey}`,
+    `derivation: ${result.derivation.status}`,
+  ].join("\n");
+}
+
+function formatCommitSummary(result: any): string {
+  const created = Array.isArray(result.createdMemories) ? result.createdMemories.length : 0;
+  return [
+    `committed session: ${result.session.id}`,
+    `partition: ${result.session.partitionKey}`,
+    `summary: ${truncate(String(result.session.summary ?? ""), 120)}`,
+    `createdMemories: ${created}`,
+  ].join("\n");
+}
+
+function formatImportFileSummary(result: any): string {
+  return [
+    `imported file: [${result.record.layer}] ${result.record.title}`,
+    `recordId: ${result.record.id}`,
+    `partition: ${result.record.partitionKey}`,
+    `derivation: ${result.derivation.status}`,
+  ].join("\n");
+}
+
+function formatImportPresetSummary(result: any): string {
+  const rows = (result.results ?? []).slice(0, 5).map((item: any, index: number) => `${index + 1}. ${item.path} -> ${item.layer ?? "?"} (${item.derivationStatus ?? (result.dryRun ? "dry-run" : "unknown")})`);
+  return [
+    `preset: ${result.preset}`,
+    `rootPath: ${result.rootPath}`,
+    `count: ${result.count}`,
+    `dryRun: ${Boolean(result.dryRun)}`,
+    ...rows,
+  ].join("\n");
+}
+
+function formatJobSummary(job: any): string {
+  return [
+    `job: ${job.id}`,
+    `status: ${job.status}`,
+    `mode: ${job.mode}${job.effectiveMode ? ` -> ${job.effectiveMode}` : ""}`,
+    `sourceRecordId: ${job.sourceRecordId ?? "-"}`,
+    `error: ${job.errorMessage ?? "-"}`,
+  ].join("\n");
+}
+
+function formatLinksSummary(payload: { items?: Array<Record<string, any>> }): string {
+  const items = payload.items ?? [];
+  const lines = [`links: ${items.length}`];
+  for (const [index, item] of items.slice(0, 8).entries()) {
+    lines.push(`${index + 1}. ${item.relation} ${item.sourceRecordId} -> ${item.targetRecordId}`);
+  }
+  return lines.join("\n");
 }
 
 export function registerPluginCommands(params: {
@@ -212,7 +296,10 @@ export function registerPluginCommands(params: {
           limit: parsed.limit,
           rerank: parsed.rerank,
         });
-        return textReply(JSON.stringify({ query: parsed, result }, null, 2));
+        if (parsed.json) {
+          return textReply(JSON.stringify({ query: parsed, result }, null, 2));
+        }
+        return textReply(formatQuerySummary({ query: parsed, result }));
       } catch (error) {
         return textReply(String(error), true);
       }
@@ -225,7 +312,14 @@ export function registerPluginCommands(params: {
     acceptsArgs: false,
     requireAuth: true,
     handler: async () => {
-      return textReply(JSON.stringify({ importPresets: config.importPresets }, null, 2));
+      const presetNames = Object.keys(config.importPresets);
+      if (presetNames.length === 0) return textReply("importPresets: none configured");
+      const lines = ["importPresets:"];
+      for (const name of presetNames) {
+        const preset = config.importPresets[name];
+        lines.push(`- ${name}: ${preset.rootPath} -> ${preset.partitionKey}/${preset.layer}`);
+      }
+      return textReply(lines.join("\n"));
     },
   });
 
@@ -237,14 +331,14 @@ export function registerPluginCommands(params: {
     handler: async () => {
       if (!state.lastSessionCapture) return textReply("no cached session available", true);
       const capture = state.lastSessionCapture;
-      return textReply(JSON.stringify({
-        capturedAt: capture.capturedAt,
-        success: capture.success,
-        durationMs: capture.durationMs,
-        messageCount: capture.messageCount,
-        title: capture.title,
-        idempotencyKey: capture.idempotencyKey,
-      }, null, 2));
+      return textReply([
+        `capturedAt: ${capture.capturedAt}`,
+        `success: ${capture.success}`,
+        `durationMs: ${capture.durationMs ?? 0}`,
+        `messageCount: ${capture.messageCount}`,
+        `title: ${capture.title}`,
+        `idempotencyKey: ${capture.idempotencyKey}`,
+      ].join("\n"));
     },
   });
 
@@ -264,7 +358,7 @@ export function registerPluginCommands(params: {
           capture,
           titleOverride: parsed.titleOverride,
         }));
-        return textReply(JSON.stringify({ action: "upload-last-session", record: (result as any).record, derivation: (result as any).derivation }, null, 2));
+        return textReply(formatImportFileSummary({ record: (result as any).record, derivation: (result as any).derivation }));
       } catch (error) {
         return textReply(String(error), true);
       }
@@ -286,7 +380,7 @@ export function registerPluginCommands(params: {
           title: parsed.title,
           text: parsed.text,
         }));
-        return textReply(JSON.stringify({ action: "save", record: (result as any).record, derivation: (result as any).derivation }, null, 2));
+        return textReply(formatSaveSummary({ record: (result as any).record, derivation: (result as any).derivation }));
       } catch (error) {
         return textReply(String(error), true);
       }
@@ -319,7 +413,7 @@ export function registerPluginCommands(params: {
           },
         };
         const result = await client.commitSession(payload);
-        return textReply(JSON.stringify({ action: "commit", result }, null, 2));
+        return textReply(formatCommitSummary(result));
       } catch (error) {
         return textReply(String(error), true);
       }
@@ -341,7 +435,7 @@ export function registerPluginCommands(params: {
           filePath: parsed.filePath,
           titleOverride: parsed.titleOverride,
         }));
-        return textReply(JSON.stringify({ action: "import-file", record: (result as any).record, derivation: (result as any).derivation }, null, 2));
+        return textReply(formatImportFileSummary({ record: (result as any).record, derivation: (result as any).derivation }));
       } catch (error) {
         return textReply(String(error), true);
       }
@@ -363,7 +457,7 @@ export function registerPluginCommands(params: {
           overrideLimit: parsed.limit,
           dryRun: parsed.dryRun,
         });
-        return textReply(JSON.stringify({ action: "import-preset", result }, null, 2));
+        return textReply(formatImportPresetSummary(result));
       } catch (error) {
         return textReply(String(error), true);
       }
@@ -380,7 +474,7 @@ export function registerPluginCommands(params: {
         const jobId = ctx.args?.trim();
         if (!jobId) throw new Error("usage: /contexthub-job <jobId>");
         const job = await client.getDerivationJob(jobId);
-        return textReply(JSON.stringify(job, null, 2));
+        return textReply(formatJobSummary(job));
       } catch (error) {
         return textReply(String(error), true);
       }
@@ -397,7 +491,7 @@ export function registerPluginCommands(params: {
         const recordId = ctx.args?.trim();
         if (!recordId) throw new Error("usage: /contexthub-links <recordId>");
         const links = await client.listRecordLinks(recordId);
-        return textReply(JSON.stringify(links, null, 2));
+        return textReply(formatLinksSummary(links));
       } catch (error) {
         return textReply(String(error), true);
       }

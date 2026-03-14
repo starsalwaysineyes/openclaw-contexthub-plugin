@@ -171,7 +171,7 @@ export function registerPluginTools(params: {
         const partitionKey = String(params.partitionKey ?? config.defaultPartitionKey ?? "").trim();
         if (!partitionKey) throw new Error("partitionKey is required");
         if (!title || !text) throw new Error("title and text are required");
-        const result = await client.importResource(
+        const result: any = await client.importResource(
           buildSaveTextPayload({
             config,
             partitionKey,
@@ -180,7 +180,7 @@ export function registerPluginTools(params: {
             text,
             tags: Array.isArray(params.tags) ? params.tags.map((item) => String(item)) : [],
           }),
-        ) as any;
+        );
         return content(`saved [${result.record.layer}] ${result.record.title} (${result.record.id})`, { result });
       },
     },
@@ -208,7 +208,7 @@ export function registerPluginTools(params: {
         const partitionKey = String(params.partitionKey ?? config.defaultPartitionKey ?? "").trim();
         if (!partitionKey) throw new Error("partitionKey is required");
         if (!filePath) throw new Error("filePath is required");
-        const result = await client.importResource(
+        const result: any = await client.importResource(
           buildImportFilePayload({
             config,
             partitionKey,
@@ -216,7 +216,7 @@ export function registerPluginTools(params: {
             filePath,
             titleOverride: String(params.title ?? "").trim() || undefined,
           }),
-        ) as any;
+        );
         return content(`imported [${result.record.layer}] ${result.record.title} (${result.record.id})`, { result });
       },
     },

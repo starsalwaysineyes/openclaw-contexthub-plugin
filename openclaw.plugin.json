@@ -3,7 +3,6 @@
   "name": "OpenClaw ContextHub Plugin",
   "description": "ContextHub recall, write, import, and raw session upload bridge for OpenClaw.",
   "version": "0.1.0",
-  "kind": "memory",
   "configSchema": {
     "type": "object",
     "additionalProperties": true,

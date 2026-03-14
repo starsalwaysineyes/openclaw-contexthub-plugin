@@ -1,0 +1,33 @@
+{
+  "name": "openclaw-contexthub-plugin",
+  "version": "0.1.0",
+  "description": "OpenClaw plugin for ContextHub recall, write, and import workflows",
+  "author": "MemTensor",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.ts",
+  "files": [
+    "index.ts",
+    "src",
+    "README.md",
+    ".env.example",
+    "tsconfig.json"
+  ],
+  "openclaw": {
+    "id": "openclaw-contexthub-plugin",
+    "extensions": [
+      "./index.ts"
+    ],
+    "installDependencies": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

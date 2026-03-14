@@ -70,6 +70,7 @@ Not implemented yet:
 - true file/blob upload once backend supports non-inline payloads
 - richer preset lifecycle and validation UX
 - stronger transcript shaping / redaction controls before upload
+- smarter capture rules so `/contexthub-last-session` can optionally track non-chat command flows too
 
 ## Config shape
 

@@ -13,6 +13,16 @@ function parseLayer(raw: string): RecallLayer {
   return normalized;
 }
 
+function splitHead(input: string): { head: string; rest: string } {
+  const trimmed = input.trim();
+  const spaceIndex = trimmed.indexOf(" ");
+  if (spaceIndex < 0) return { head: trimmed, rest: "" };
+  return {
+    head: trimmed.slice(0, spaceIndex),
+    rest: trimmed.slice(spaceIndex + 1).trim(),
+  };
+}
+
 function parseSaveArgs(args: string | undefined, defaultPartitionKey?: string): {
   layer: RecallLayer;
   partitionKey: string;
@@ -20,19 +30,19 @@ function parseSaveArgs(args: string | undefined, defaultPartitionKey?: string): 
   text: string;
 } {
   const input = args?.trim() || "";
-  const parts = input.split(/\s+/, 3);
-  if (parts.length < 2) {
+  const first = splitHead(input);
+  const second = splitHead(first.rest);
+  if (!first.head || !second.head || !second.rest) {
     throw new Error("usage: /contexthub-save <layer> <partitionKey|-> <title> :: <text>");
   }
-  const layer = parseLayer(parts[0]);
-  const partitionToken = parts[1];
+  const layer = parseLayer(first.head);
+  const partitionToken = second.head;
   const partitionKey = partitionToken === "-" ? defaultPartitionKey : partitionToken;
   if (!partitionKey) throw new Error("partitionKey is required (or configure defaultPartitionKey)");
-  const rest = input.split(/\s+/, 3)[2] || "";
-  const marker = rest.indexOf("::");
+  const marker = second.rest.indexOf("::");
   if (marker < 0) throw new Error("usage: /contexthub-save <layer> <partitionKey|-> <title> :: <text>");
-  const title = rest.slice(0, marker).trim();
-  const text = rest.slice(marker + 2).trim();
+  const title = second.rest.slice(0, marker).trim();
+  const text = second.rest.slice(marker + 2).trim();
   if (!title || !text) throw new Error("title and text are required");
   return { layer, partitionKey, title, text };
 }
@@ -44,15 +54,14 @@ function parseCommitArgs(args: string | undefined, defaultPartitionKey?: string)
   memoryText?: string;
 } {
   const input = args?.trim() || "";
-  const parts = input.split(/\s+/, 2);
-  if (parts.length < 2) {
+  const first = splitHead(input);
+  if (!first.head || !first.rest) {
     throw new Error("usage: /contexthub-commit <partitionKey|-> <summary> [:: memoryTitle :: memoryText]");
   }
-  const partitionToken = parts[0];
+  const partitionToken = first.head;
   const partitionKey = partitionToken === "-" ? defaultPartitionKey : partitionToken;
   if (!partitionKey) throw new Error("partitionKey is required (or configure defaultPartitionKey)");
-  const rest = parts[1];
-  const segments = rest.split("::").map((item) => item.trim()).filter(Boolean);
+  const segments = first.rest.split("::").map((item) => item.trim()).filter(Boolean);
   if (segments.length === 0) throw new Error("summary is required");
   return {
     partitionKey,
@@ -69,15 +78,16 @@ function parseImportFileArgs(args: string | undefined, defaultPartitionKey?: str
   titleOverride?: string;
 } {
   const input = args?.trim() || "";
-  const parts = input.split(/\s+/, 3);
-  if (parts.length < 3) {
+  const first = splitHead(input);
+  const second = splitHead(first.rest);
+  if (!first.head || !second.head || !second.rest) {
     throw new Error("usage: /contexthub-import-file <layer> <partitionKey|-> <filePath> [:: title]");
   }
-  const layer = parseLayer(parts[0]);
-  const partitionToken = parts[1];
+  const layer = parseLayer(first.head);
+  const partitionToken = second.head;
   const partitionKey = partitionToken === "-" ? defaultPartitionKey : partitionToken;
   if (!partitionKey) throw new Error("partitionKey is required (or configure defaultPartitionKey)");
-  const fileAndTitle = parts[2];
+  const fileAndTitle = second.rest;
   const marker = fileAndTitle.indexOf("::");
   const filePath = (marker >= 0 ? fileAndTitle.slice(0, marker) : fileAndTitle).trim();
   const titleOverride = marker >= 0 ? fileAndTitle.slice(marker + 2).trim() : undefined;

@@ -50,6 +50,19 @@ export interface QueryRequest {
   rerank: boolean;
 }
 
+export interface ListRecordsRequest {
+  tenantId: string;
+  partitions: string[];
+  types?: string[];
+  layers: RecallLayer[];
+  tags?: string[];
+  titleContains?: string;
+  sourceKind?: string;
+  sourcePathPrefix?: string;
+  offset?: number;
+  limit?: number;
+}
+
 export interface GrepRequest {
   tenantId: string;
   pattern: string;
@@ -75,6 +88,28 @@ export interface QueryItem {
 export interface QueryResponse {
   items: QueryItem[];
   retrieval?: Record<string, unknown>;
+}
+
+export interface ListRecordItem {
+  id: string;
+  partitionKey: string;
+  type: string;
+  layer: RecallLayer;
+  title: string;
+  manualSummary?: string;
+  tags?: string[];
+  source?: Record<string, unknown> | null;
+  lineCount: number;
+  textPreview: string;
+  importance: number;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListRecordsResponse {
+  items: ListRecordItem[];
+  page?: Record<string, unknown>;
 }
 
 export interface RecordReadLine {

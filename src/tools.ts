@@ -30,6 +30,11 @@ function normalizeLimit(raw: unknown, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function normalizeStringArray(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => String(item).trim()).filter(Boolean);
+}
+
 export function registerPluginTools(params: {
   api: { registerTool: Function };
   config: ContextHubPluginConfig;
@@ -99,6 +104,50 @@ export function registerPluginTools(params: {
           `hasMore: ${Boolean(result.hasMore)}`,
           ...result.items.map((item) => `${item.lineNumber}: ${item.text}`),
         ];
+        return content(lines.join("\n"), { result });
+      },
+    },
+  );
+
+  api.registerTool(
+    {
+      name: "ctx_list",
+      description: "Browse ContextHub records with structural filters when the agent does not yet know a recordId.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          partitions: { type: "array", items: { type: "string" }, description: "Optional partition override" },
+          layers: { type: "array", items: { type: "string", enum: ["l0", "l1", "l2"] }, description: "Optional layer override" },
+          tags: { type: "array", items: { type: "string" }, description: "Optional tag filter" },
+          titleContains: { type: "string", description: "Optional title substring" },
+          sourcePathPrefix: { type: "string", description: "Optional source relative/path prefix" },
+          limit: { type: "number", description: "Optional max records" },
+          offset: { type: "number", description: "Optional offset" },
+        },
+      },
+      async execute(_toolCallId: string, params: Record<string, unknown>) {
+        const result = await client.listRecords({
+          tenantId: config.tenantId,
+          partitions: normalizePartitions(params.partitions, config.recall.preAnswer.partitions),
+          layers: normalizeLayers(params.layers, ["l0", "l1", "l2"]),
+          tags: normalizeStringArray(params.tags),
+          titleContains: typeof params.titleContains === "string" ? params.titleContains : undefined,
+          sourcePathPrefix: typeof params.sourcePathPrefix === "string" ? params.sourcePathPrefix : undefined,
+          offset: params.offset == null ? 0 : normalizeLimit(params.offset, 0),
+          limit: normalizeLimit(params.limit, 20),
+        });
+        const items = result.items ?? [];
+        const lines = [
+          `records: ${items.length}`,
+          `hasMore: ${Boolean(result.page?.hasMore)}`,
+        ];
+        for (const [index, item] of items.slice(0, 8).entries()) {
+          const sourcePath = String(item.source?.relativePath ?? item.source?.path ?? "-");
+          lines.push(`${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey})`);
+          lines.push(`   id=${item.id} lines=${item.lineCount} source=${sourcePath}`);
+          lines.push(`   ${truncate(item.textPreview ?? "", 160)}`);
+        }
         return content(lines.join("\n"), { result });
       },
     },

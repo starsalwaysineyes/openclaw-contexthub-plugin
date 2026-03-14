@@ -188,6 +188,31 @@ function parseReadArgs(args: string | undefined): {
   };
 }
 
+function parseListArgs(
+  args: string | undefined,
+  defaults: { partitions: string[]; layers: RecallLayer[]; limit: number },
+): {
+  partitions: string[];
+  layers: RecallLayer[];
+  titleContains?: string;
+  sourcePathPrefix?: string;
+  limit: number;
+  json: boolean;
+} {
+  const rawInput = args?.trim() || "";
+  const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
+  const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
+  const parts = input ? input.split("::").map((item) => item.trim()) : [];
+  return {
+    partitions: parts[0] ? parts[0].split(",").map((item) => item.trim()).filter(Boolean) : defaults.partitions,
+    layers: parts[1] ? parts[1].split(",").map((item) => item.trim().toLowerCase()).filter(Boolean) as RecallLayer[] : defaults.layers,
+    titleContains: parts[2] || undefined,
+    sourcePathPrefix: parts[3] || undefined,
+    limit: parts[4] ? Number(parts[4]) : defaults.limit,
+    json,
+  };
+}
+
 function parseGrepArgs(
   args: string | undefined,
   defaults: { partitions: string[]; layers: RecallLayer[]; limit: number },
@@ -291,6 +316,18 @@ function formatImportFileSummary(result: any): string {
   ].join("\n");
 }
 
+function formatListSummary(result: any): string {
+  const items = result.items ?? [];
+  const page = result.page ?? {};
+  const lines = [`records: ${items.length}`, `hasMore: ${Boolean(page.hasMore)}`, `totalMatched: ${page.totalMatched ?? items.length}`];
+  for (const [index, item] of items.slice(0, 8).entries()) {
+    const sourcePath = String(item.source?.relativePath ?? item.source?.path ?? "-");
+    lines.push(`${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey})`);
+    lines.push(`   id=${item.id} lines=${item.lineCount} source=${sourcePath}`);
+  }
+  return lines.join("\n");
+}
+
 function formatReadSummary(result: any): string {
   const lines = [
     `read: [${result.record.layer}] ${result.record.title}`,
@@ -352,6 +389,7 @@ function formatCtxHelp(): string {
     "ctx commands:",
     "- /ctx q <query> [:: partitions] [:: layers] [:: limit] [:: rerank] [--json]",
     "- /ctx g <pattern> [:: partitions] [:: layers] [:: limit] [:: regex] [:: caseSensitive] [--json]",
+    "- /ctx ls [:: partitions] [:: layers] [:: titleContains] [:: sourcePathPrefix] [:: limit] [--json]",
     "- /ctx r <recordId> [:: fromLine] [:: limit] [--json]",
     "- /ctx p",
     "- /ctx s <layer> <partitionKey|-> <title> :: <text>",
@@ -417,6 +455,23 @@ export function registerPluginCommands(params: {
               caseSensitive: parsed.caseSensitive,
             });
             return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatGrepSummary(result));
+          }
+          case "ls": {
+            const parsed = parseListArgs(rest, {
+              partitions: config.recall.preAnswer.partitions,
+              layers: ["l0", "l1", "l2"],
+              limit: 20,
+            });
+            const result = await client.listRecords({
+              tenantId: config.tenantId,
+              partitions: parsed.partitions,
+              layers: parsed.layers,
+              titleContains: parsed.titleContains,
+              sourcePathPrefix: parsed.sourcePathPrefix,
+              limit: parsed.limit,
+              offset: 0,
+            });
+            return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatListSummary(result));
           }
           case "r": {
             const parsed = parseReadArgs(rest);

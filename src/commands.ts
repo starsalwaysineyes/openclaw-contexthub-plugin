@@ -347,6 +347,24 @@ function formatLinksSummary(payload: { items?: Array<Record<string, any>> }): st
   return lines.join("\n");
 }
 
+function formatCtxHelp(): string {
+  return [
+    "ctx commands:",
+    "- /ctx q <query> [:: partitions] [:: layers] [:: limit] [:: rerank] [--json]",
+    "- /ctx g <pattern> [:: partitions] [:: layers] [:: limit] [:: regex] [:: caseSensitive] [--json]",
+    "- /ctx r <recordId> [:: fromLine] [:: limit] [--json]",
+    "- /ctx p",
+    "- /ctx s <layer> <partitionKey|-> <title> :: <text>",
+    "- /ctx c <partitionKey|-> <summary> [:: memoryTitle :: memoryText]",
+    "- /ctx f <layer> <partitionKey|-> <filePath> [:: title]",
+    "- /ctx ip <presetName> [limit] [--dry-run]",
+    "- /ctx j <jobId>",
+    "- /ctx l <recordId>",
+    "- /ctx last",
+    "- /ctx up <partitionKey|-> [:: title]",
+  ].join("\n");
+}
+
 export function registerPluginCommands(params: {
   api: { registerCommand: Function };
   config: ContextHubPluginConfig;
@@ -354,6 +372,165 @@ export function registerPluginCommands(params: {
   state: { lastSessionCapture: LastSessionCapture | null };
 }) {
   const { api, config, client, state } = params;
+
+  api.registerCommand({
+    name: "ctx",
+    description: "Short ContextHub command router",
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: async (ctx: PluginCommandContext) => {
+      try {
+        const raw = ctx.args?.trim() || "";
+        if (!raw) return textReply(formatCtxHelp());
+        const { head: subcommand, rest } = splitHead(raw);
+        switch (subcommand.toLowerCase()) {
+          case "q": {
+            const parsed = parseQueryArgs(rest, {
+              partitions: config.recall.preAnswer.partitions,
+              layers: config.recall.preAnswer.layers,
+              limit: config.recall.preAnswer.limit,
+              rerank: config.recall.preAnswer.rerank,
+            });
+            const result = await client.query({
+              tenantId: config.tenantId,
+              query: parsed.query,
+              partitions: parsed.partitions,
+              layers: parsed.layers,
+              limit: parsed.limit,
+              rerank: parsed.rerank,
+            });
+            return textReply(parsed.json ? JSON.stringify({ query: parsed, result }, null, 2) : formatQuerySummary({ query: parsed, result }));
+          }
+          case "g": {
+            const parsed = parseGrepArgs(rest, {
+              partitions: config.recall.preAnswer.partitions,
+              layers: ["l0", "l1", "l2"],
+              limit: 20,
+            });
+            const result = await client.grep({
+              tenantId: config.tenantId,
+              pattern: parsed.pattern,
+              partitions: parsed.partitions,
+              layers: parsed.layers,
+              limit: parsed.limit,
+              regex: parsed.regex,
+              caseSensitive: parsed.caseSensitive,
+            });
+            return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatGrepSummary(result));
+          }
+          case "r": {
+            const parsed = parseReadArgs(rest);
+            const result = await client.readRecordLines(parsed.recordId, parsed.fromLine, parsed.limit);
+            return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatReadSummary(result));
+          }
+          case "p":
+            return textReply((() => {
+              const presetNames = Object.keys(config.importPresets);
+              if (presetNames.length === 0) return "importPresets: none configured";
+              const lines = ["importPresets:"];
+              for (const name of presetNames) {
+                const preset = config.importPresets[name];
+                lines.push(`- ${name}: ${preset.rootPath} -> ${preset.partitionKey}/${preset.layer}`);
+              }
+              return lines.join("\n");
+            })());
+          case "s": {
+            const parsed = parseSaveArgs(rest, config.defaultPartitionKey);
+            const result = await client.importResource(buildSaveTextPayload({
+              config,
+              partitionKey: parsed.partitionKey,
+              layer: parsed.layer,
+              title: parsed.title,
+              text: parsed.text,
+            }));
+            return textReply(formatSaveSummary({ record: (result as any).record, derivation: (result as any).derivation }));
+          }
+          case "c": {
+            const parsed = parseCommitArgs(rest, config.defaultPartitionKey);
+            const payload: Record<string, unknown> = {
+              tenantId: config.tenantId,
+              partitionKey: parsed.partitionKey,
+              summary: parsed.summary,
+              messages: [],
+              memoryEntries: parsed.memoryTitle && parsed.memoryText ? [{
+                title: parsed.memoryTitle,
+                text: parsed.memoryText,
+                layer: "l0",
+                importance: 3.0,
+                tags: ["plugin-commit"],
+              }] : [],
+              metadata: { adapter: "openclaw-contexthub-plugin", command: "ctx.c" },
+            };
+            const result = await client.commitSession(payload);
+            return textReply(formatCommitSummary(result));
+          }
+          case "f": {
+            const parsed = parseImportFileArgs(rest, config.defaultPartitionKey);
+            const result = await client.importResource(buildImportFilePayload({
+              config,
+              partitionKey: parsed.partitionKey,
+              layer: parsed.layer,
+              filePath: parsed.filePath,
+              titleOverride: parsed.titleOverride,
+            }));
+            return textReply(formatImportFileSummary({ record: (result as any).record, derivation: (result as any).derivation }));
+          }
+          case "ip": {
+            const parsed = parseImportPresetArgs(rest);
+            const result = await runImportPreset({
+              client,
+              config,
+              presetName: parsed.presetName,
+              overrideLimit: parsed.limit,
+              dryRun: parsed.dryRun,
+            });
+            return textReply(formatImportPresetSummary(result));
+          }
+          case "j": {
+            const jobId = rest.trim();
+            if (!jobId) throw new Error("usage: /ctx j <jobId>");
+            const job = await client.getDerivationJob(jobId);
+            return textReply(formatJobSummary(job));
+          }
+          case "l": {
+            const recordId = rest.trim();
+            if (!recordId) throw new Error("usage: /ctx l <recordId>");
+            const links = await client.listRecordLinks(recordId);
+            return textReply(formatLinksSummary(links));
+          }
+          case "last": {
+            if (!state.lastSessionCapture) return textReply("no cached session available", true);
+            const capture = state.lastSessionCapture;
+            return textReply([
+              `capturedAt: ${capture.capturedAt}`,
+              `success: ${capture.success}`,
+              `durationMs: ${capture.durationMs ?? 0}`,
+              `messageCount: ${capture.messageCount}`,
+              `title: ${capture.title}`,
+              `idempotencyKey: ${capture.idempotencyKey}`,
+            ].join("\n"));
+          }
+          case "up": {
+            const capture = state.lastSessionCapture;
+            if (!capture) throw new Error("no cached session available; wait until a session completes first");
+            const parsed = parseUploadLastSessionArgs(rest, config.defaultPartitionKey);
+            const result = await client.importResource(buildUploadLastSessionPayload({
+              config,
+              partitionKey: parsed.partitionKey,
+              capture,
+              titleOverride: parsed.titleOverride,
+            }));
+            return textReply(formatImportFileSummary({ record: (result as any).record, derivation: (result as any).derivation }));
+          }
+          case "help":
+          default:
+            return textReply(formatCtxHelp(), subcommand.toLowerCase() !== "help");
+        }
+      } catch (error) {
+        return textReply(String(error), true);
+      }
+    },
+  });
 
   api.registerCommand({
     name: "contexthub-recall",

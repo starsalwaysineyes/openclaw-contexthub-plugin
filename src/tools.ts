@@ -385,8 +385,86 @@ export function registerPluginTools(params: {
           `status: ${result.status}`,
           `mode: ${result.mode ?? "-"}${result.effectiveMode ? ` -> ${result.effectiveMode}` : ""}`,
           `sourceRecordId: ${result.sourceRecordId ?? "-"}`,
+          `sourceRecordTitle: ${result.sourceRecordTitle ?? "-"}`,
           `error: ${result.errorMessage ?? "-"}`,
         ];
+        return content(lines.join("\n"), { result });
+      },
+    },
+  );
+
+  api.registerTool(
+    {
+      name: "ctx_jobs",
+      description: "List derivation jobs with queue/status filters for operator inspection.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          partitions: { type: "array", items: { type: "string" }, description: "Optional partition override" },
+          statuses: { type: "array", items: { type: "string", enum: ["queued", "running", "completed", "failed"] }, description: "Optional status filter" },
+          sourceRecordId: { type: "string", description: "Optional source record filter" },
+          offset: { type: "number", description: "Optional offset" },
+          limit: { type: "number", description: "Optional max jobs" },
+        },
+      },
+      async execute(_toolCallId: string, params: Record<string, unknown>) {
+        const result = await client.listDerivationJobs({
+          tenantId: config.tenantId,
+          partitions: normalizePartitions(params.partitions, config.recall.preAnswer.partitions),
+          statuses: normalizeStringArray(params.statuses),
+          sourceRecordId: typeof params.sourceRecordId === "string" ? params.sourceRecordId : undefined,
+          offset: params.offset == null ? 0 : normalizeLimit(params.offset, 0),
+          limit: normalizeLimit(params.limit, 20),
+        });
+        const lines = [
+          ...summarizeScope((result as any).scope),
+          `jobs: ${(result.items ?? []).length}`,
+          `statusCounts: ${JSON.stringify(result.statusCounts ?? {})}`,
+        ];
+        for (const [index, item] of (result.items ?? []).slice(0, 8).entries()) {
+          lines.push(`${index + 1}. ${item.id} ${item.status} (${item.partitionKey ?? "-"})`);
+          lines.push(`   source=${item.sourceRecordTitle ?? item.sourceRecordId ?? "-"}`);
+        }
+        return content(lines.join("\n"), { result });
+      },
+    },
+  );
+
+  api.registerTool(
+    {
+      name: "ctx_redrive",
+      description: "Redrive derivation jobs for retries with optional dry-run.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          partitions: { type: "array", items: { type: "string" }, description: "Optional partition override" },
+          statuses: { type: "array", items: { type: "string", enum: ["queued", "running", "completed", "failed"] }, description: "Optional status filter" },
+          jobIds: { type: "array", items: { type: "string" }, description: "Optional explicit job IDs" },
+          dryRun: { type: "boolean", description: "Only preview selected jobs" },
+          limit: { type: "number", description: "Max jobs to redrive" },
+          reason: { type: "string", description: "Operator reason label" },
+        },
+      },
+      async execute(_toolCallId: string, params: Record<string, unknown>) {
+        const result = await client.redriveDerivationJobs({
+          tenantId: config.tenantId,
+          partitions: normalizePartitions(params.partitions, config.recall.preAnswer.partitions),
+          statuses: normalizeStringArray(params.statuses),
+          jobIds: normalizeStringArray(params.jobIds),
+          dryRun: Boolean(params.dryRun),
+          limit: normalizeLimit(params.limit, 20),
+          reason: typeof params.reason === "string" ? params.reason : "agent_redrive",
+        });
+        const lines = [
+          ...summarizeScope((result as any).scope),
+          `redrive: ${JSON.stringify(result.redrive ?? {})}`,
+          `jobs: ${(result.items ?? []).length}`,
+        ];
+        for (const [index, item] of (result.items ?? []).slice(0, 6).entries()) {
+          lines.push(`${index + 1}. ${item.id} ${item.status}`);
+        }
         return content(lines.join("\n"), { result });
       },
     },

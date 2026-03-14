@@ -48,7 +48,7 @@ Implemented in this repo now:
 
 - minimal `before_agent_start` hook
 - `agent_end` cache of the last completed session transcript (no automatic write)
-- ContextHub HTTP client for `query`, `grep`, `readRecordLines`, `importResource`, `commitSession`, `getDerivationJob`, `listRecordLinks`
+- ContextHub HTTP client for `query`, `grep`, `readRecordLines`, `importResource`, `commitSession`, `getDerivationJob`, `listDerivationJobs`, `redriveDerivationJobs`, `listRecordLinks`
 - config resolution from plugin config + env
 - agent-facing tools:
   - `ctx_query`
@@ -60,6 +60,8 @@ Implemented in this repo now:
   - `ctx_import_file` (optional)
   - `ctx_import_preset` (optional)
   - `ctx_job`
+  - `ctx_jobs`
+  - `ctx_redrive`
   - `ctx_links`
 - preferred short operator entrypoint:
   - `/ctx q ...`
@@ -72,6 +74,8 @@ Implemented in this repo now:
   - `/ctx f ...`
   - `/ctx ip ...`
   - `/ctx j ...`
+  - `/ctx jl ...`
+  - `/ctx jr ...`
   - `/ctx l ...`
   - `/ctx last`
   - `/ctx up ...`
@@ -88,6 +92,8 @@ Implemented in this repo now:
   - `/contexthub-import-file <layer> <partitionKey|-> <filePath> [:: title]`
   - `/contexthub-import-preset <presetName> [limit] [--dry-run]`
   - `/contexthub-job <jobId>`
+  - `/contexthub-jobs [:: partitions] [:: statuses] [:: sourceRecordId] [:: limit] [:: offset] [--json]`
+  - `/contexthub-redrive [:: partitions] [:: statuses] [:: jobIds] [:: dryRun] [:: limit] [:: reason] [--json]`
   - `/contexthub-links <recordId>`
 - GitHub Actions CI: `npm ci` + `npm run check`
 

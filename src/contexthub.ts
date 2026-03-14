@@ -1,4 +1,20 @@
-import type { BrowseTreeRequest, BrowseTreeResponse, DerivationJob, GrepRequest, GrepResponse, ListRecordsRequest, ListRecordsResponse, QueryRequest, QueryResponse, RecordLink, RecordReadResponse } from "./types.js";
+import type {
+  BrowseTreeRequest,
+  BrowseTreeResponse,
+  DerivationJob,
+  DerivationJobListRequest,
+  DerivationJobListResponse,
+  DerivationJobRedriveRequest,
+  DerivationJobRedriveResponse,
+  GrepRequest,
+  GrepResponse,
+  ListRecordsRequest,
+  ListRecordsResponse,
+  QueryRequest,
+  QueryResponse,
+  RecordLink,
+  RecordReadResponse,
+} from "./types.js";
 
 export interface ContextHubHttpClientOptions {
   baseUrl: string;
@@ -38,6 +54,14 @@ export class ContextHubHttpClient {
 
   async getDerivationJob(jobId: string): Promise<DerivationJob> {
     return this.request<DerivationJob>("GET", `/v1/derivation-jobs/${jobId}`);
+  }
+
+  async listDerivationJobs(payload: DerivationJobListRequest): Promise<DerivationJobListResponse> {
+    return this.request<DerivationJobListResponse>("POST", "/v1/derivation-jobs/list", payload);
+  }
+
+  async redriveDerivationJobs(payload: DerivationJobRedriveRequest): Promise<DerivationJobRedriveResponse> {
+    return this.request<DerivationJobRedriveResponse>("POST", "/v1/derivation-jobs/redrive", payload);
   }
 
   async listRecordLinks(recordId: string): Promise<{ items: RecordLink[] }> {

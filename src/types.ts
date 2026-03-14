@@ -200,13 +200,52 @@ export interface GrepResponse {
 
 export interface DerivationJob {
   id: string;
+  tenantId?: string;
+  partitionKey?: string;
   status: string;
   mode?: string;
   effectiveMode?: string;
   sourceRecordId?: string;
+  sourceRecordTitle?: string | null;
+  sourceRecordLayer?: string | null;
   requestedLayers?: string[];
   errorMessage?: string | null;
   metadata?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+  finishedAt?: string | null;
+}
+
+export interface DerivationJobListRequest {
+  tenantId: string;
+  partitions: string[];
+  statuses?: string[];
+  sourceRecordId?: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface DerivationJobListResponse {
+  items: DerivationJob[];
+  page?: Record<string, unknown>;
+  statusCounts?: Record<string, number>;
+  scope?: ResponseScope;
+}
+
+export interface DerivationJobRedriveRequest {
+  tenantId: string;
+  partitions: string[];
+  statuses?: string[];
+  jobIds?: string[];
+  dryRun?: boolean;
+  limit?: number;
+  reason?: string;
+}
+
+export interface DerivationJobRedriveResponse {
+  items: DerivationJob[];
+  redrive?: Record<string, unknown>;
+  scope?: ResponseScope;
 }
 
 export interface RecordLink {

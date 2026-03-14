@@ -244,6 +244,60 @@ function parseListArgs(
   };
 }
 
+function parseJobListArgs(
+  args: string | undefined,
+  defaults: { partitions: string[]; limit: number },
+): {
+  partitions: string[];
+  statuses: string[];
+  sourceRecordId?: string;
+  limit: number;
+  offset: number;
+  json: boolean;
+} {
+  const rawInput = args?.trim() || "";
+  const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
+  const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
+  const parts = input ? input.split("::").map((item) => item.trim()) : [];
+  return {
+    partitions: parts[0] ? parts[0].split(",").map((item) => item.trim()).filter(Boolean) : defaults.partitions,
+    statuses: parts[1] ? parts[1].split(",").map((item) => item.trim().toLowerCase()).filter(Boolean) : [],
+    sourceRecordId: parts[2] || undefined,
+    limit: parts[3] ? Number(parts[3]) : defaults.limit,
+    offset: parts[4] ? Number(parts[4]) : 0,
+    json,
+  };
+}
+
+function parseJobRedriveArgs(
+  args: string | undefined,
+  defaults: { partitions: string[]; limit: number },
+): {
+  partitions: string[];
+  statuses: string[];
+  jobIds: string[];
+  dryRun: boolean;
+  limit: number;
+  reason: string;
+  json: boolean;
+} {
+  const rawInput = args?.trim() || "";
+  const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
+  const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
+  const parts = input ? input.split("::").map((item) => item.trim()) : [];
+  const dryRunToken = (parts[3] ?? "true").toLowerCase();
+  const dryRun = ["1", "true", "yes", "on", "dry", "dry-run"].includes(dryRunToken);
+  return {
+    partitions: parts[0] ? parts[0].split(",").map((item) => item.trim()).filter(Boolean) : defaults.partitions,
+    statuses: parts[1] ? parts[1].split(",").map((item) => item.trim().toLowerCase()).filter(Boolean) : ["failed"],
+    jobIds: parts[2] ? parts[2].split(",").map((item) => item.trim()).filter(Boolean) : [],
+    dryRun,
+    limit: parts[4] ? Number(parts[4]) : defaults.limit,
+    reason: parts[5] || "ctx_redrive",
+    json,
+  };
+}
+
 function parseGrepArgs(
   args: string | undefined,
   defaults: { partitions: string[]; layers: RecallLayer[]; limit: number },
@@ -439,8 +493,37 @@ function formatJobSummary(job: any): string {
     `status: ${job.status}`,
     `mode: ${job.mode}${job.effectiveMode ? ` -> ${job.effectiveMode}` : ""}`,
     `sourceRecordId: ${job.sourceRecordId ?? "-"}`,
+    `sourceRecordTitle: ${job.sourceRecordTitle ?? "-"}`,
     `error: ${job.errorMessage ?? "-"}`,
   ].join("\n");
+}
+
+function formatJobListSummary(result: any): string {
+  const items = result.items ?? [];
+  const lines = [
+    formatScopeSummary(result.scope) ?? "scope: -",
+    `jobs: ${items.length}`,
+    `page: offset=${result.page?.offset ?? 0} limit=${result.page?.limit ?? "?"} total=${result.page?.totalMatched ?? "?"}`,
+    `statusCounts: ${JSON.stringify(result.statusCounts ?? {})}`,
+  ];
+  for (const [index, item] of items.slice(0, 8).entries()) {
+    lines.push(`${index + 1}. ${item.id} ${item.status} (${item.partitionKey ?? "-"})`);
+    lines.push(`   source=${item.sourceRecordTitle ?? item.sourceRecordId ?? "-"}`);
+  }
+  return lines.join("\n");
+}
+
+function formatRedriveSummary(result: any): string {
+  const items = result.items ?? [];
+  const lines = [
+    formatScopeSummary(result.scope) ?? "scope: -",
+    `redrive: ${JSON.stringify(result.redrive ?? {})}`,
+    `jobs: ${items.length}`,
+  ];
+  for (const [index, item] of items.slice(0, 6).entries()) {
+    lines.push(`${index + 1}. ${item.id} ${item.status}`);
+  }
+  return lines.join("\n");
 }
 
 function formatLinksSummary(payload: { items?: Array<Record<string, any>> }): string {
@@ -466,6 +549,8 @@ function formatCtxHelp(): string {
     "- /ctx f <layer> <partitionKey|-> <filePath> [:: title]",
     "- /ctx ip <presetName> [limit] [--dry-run]",
     "- /ctx j <jobId>",
+    "- /ctx jl [:: partitions] [:: statuses] [:: sourceRecordId] [:: limit] [:: offset] [--json]",
+    "- /ctx jr [:: partitions] [:: statuses] [:: jobIds] [:: dryRun] [:: limit] [:: reason] [--json]",
     "- /ctx l <recordId>",
     "- /ctx last",
     "- /ctx up <partitionKey|-> [:: title]",
@@ -635,6 +720,37 @@ export function registerPluginCommands(params: {
             if (!jobId) throw new Error("usage: /ctx j <jobId>");
             const job = await client.getDerivationJob(jobId);
             return textReply(formatJobSummary(job));
+          }
+          case "jl": {
+            const parsed = parseJobListArgs(rest, {
+              partitions: config.recall.preAnswer.partitions,
+              limit: 20,
+            });
+            const result = await client.listDerivationJobs({
+              tenantId: config.tenantId,
+              partitions: parsed.partitions,
+              statuses: parsed.statuses,
+              sourceRecordId: parsed.sourceRecordId,
+              limit: parsed.limit,
+              offset: parsed.offset,
+            });
+            return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatJobListSummary(result));
+          }
+          case "jr": {
+            const parsed = parseJobRedriveArgs(rest, {
+              partitions: config.recall.preAnswer.partitions,
+              limit: 20,
+            });
+            const result = await client.redriveDerivationJobs({
+              tenantId: config.tenantId,
+              partitions: parsed.partitions,
+              statuses: parsed.statuses,
+              jobIds: parsed.jobIds,
+              dryRun: parsed.dryRun,
+              limit: parsed.limit,
+              reason: parsed.reason,
+            });
+            return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatRedriveSummary(result));
           }
           case "l": {
             const recordId = rest.trim();
@@ -940,6 +1056,59 @@ export function registerPluginCommands(params: {
         if (!jobId) throw new Error("usage: /contexthub-job <jobId>");
         const job = await client.getDerivationJob(jobId);
         return textReply(formatJobSummary(job));
+      } catch (error) {
+        return textReply(String(error), true);
+      }
+    },
+  });
+
+  api.registerCommand({
+    name: "contexthub-jobs",
+    description: "List derivation jobs: /contexthub-jobs [:: partitions] [:: statuses] [:: sourceRecordId] [:: limit] [:: offset] [--json]",
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: async (ctx: PluginCommandContext) => {
+      try {
+        const parsed = parseJobListArgs(ctx.args, {
+          partitions: config.recall.preAnswer.partitions,
+          limit: 20,
+        });
+        const result = await client.listDerivationJobs({
+          tenantId: config.tenantId,
+          partitions: parsed.partitions,
+          statuses: parsed.statuses,
+          sourceRecordId: parsed.sourceRecordId,
+          limit: parsed.limit,
+          offset: parsed.offset,
+        });
+        return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatJobListSummary(result));
+      } catch (error) {
+        return textReply(String(error), true);
+      }
+    },
+  });
+
+  api.registerCommand({
+    name: "contexthub-redrive",
+    description: "Redrive derivation jobs: /contexthub-redrive [:: partitions] [:: statuses] [:: jobIds] [:: dryRun] [:: limit] [:: reason] [--json]",
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: async (ctx: PluginCommandContext) => {
+      try {
+        const parsed = parseJobRedriveArgs(ctx.args, {
+          partitions: config.recall.preAnswer.partitions,
+          limit: 20,
+        });
+        const result = await client.redriveDerivationJobs({
+          tenantId: config.tenantId,
+          partitions: parsed.partitions,
+          statuses: parsed.statuses,
+          jobIds: parsed.jobIds,
+          dryRun: parsed.dryRun,
+          limit: parsed.limit,
+          reason: parsed.reason,
+        });
+        return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatRedriveSummary(result));
       } catch (error) {
         return textReply(String(error), true);
       }

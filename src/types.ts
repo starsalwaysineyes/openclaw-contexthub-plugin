@@ -50,6 +50,16 @@ export interface QueryRequest {
   rerank: boolean;
 }
 
+export interface BrowseTreeRequest {
+  tenantId: string;
+  partitions: string[];
+  types?: string[];
+  layers: RecallLayer[];
+  sourceKind?: string;
+  pathPrefix?: string;
+  limit?: number;
+}
+
 export interface ListRecordsRequest {
   tenantId: string;
   partitions: string[];
@@ -110,6 +120,21 @@ export interface ListRecordItem {
 export interface ListRecordsResponse {
   items: ListRecordItem[];
   page?: Record<string, unknown>;
+}
+
+export interface BrowseTreeNode {
+  name: string;
+  path: string;
+  kind: "file" | "dir";
+  recordCount: number;
+  layers?: Record<string, number>;
+  partitions?: Record<string, number>;
+}
+
+export interface BrowseTreeResponse {
+  pathPrefix: string;
+  items: BrowseTreeNode[];
+  summary?: Record<string, unknown>;
 }
 
 export interface RecordReadLine {

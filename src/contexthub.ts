@@ -1,4 +1,4 @@
-import type { DerivationJob, GrepRequest, GrepResponse, ListRecordsRequest, ListRecordsResponse, QueryRequest, QueryResponse, RecordLink, RecordReadResponse } from "./types.js";
+import type { BrowseTreeRequest, BrowseTreeResponse, DerivationJob, GrepRequest, GrepResponse, ListRecordsRequest, ListRecordsResponse, QueryRequest, QueryResponse, RecordLink, RecordReadResponse } from "./types.js";
 
 export interface ContextHubHttpClientOptions {
   baseUrl: string;
@@ -18,6 +18,10 @@ export class ContextHubHttpClient {
 
   async listRecords(payload: ListRecordsRequest): Promise<ListRecordsResponse> {
     return this.request<ListRecordsResponse>("POST", "/v1/records/list", payload);
+  }
+
+  async browseRecordTree(payload: BrowseTreeRequest): Promise<BrowseTreeResponse> {
+    return this.request<BrowseTreeResponse>("POST", "/v1/records/tree", payload);
   }
 
   async readRecordLines(recordId: string, fromLine = 1, limit = 80): Promise<RecordReadResponse> {

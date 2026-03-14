@@ -52,6 +52,7 @@ Implemented in this repo now:
 - config resolution from plugin config + env
 - agent-facing tools:
   - `ctx_query`
+  - `ctx_tree`
   - `ctx_list`
   - `ctx_read`
   - `ctx_grep`

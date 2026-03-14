@@ -111,6 +111,41 @@ export function registerPluginTools(params: {
 
   api.registerTool(
     {
+      name: "ctx_tree",
+      description: "Browse one source-path tree level in ContextHub, similar to listing a directory in a remote file system.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          partitions: { type: "array", items: { type: "string" }, description: "Optional partition override" },
+          layers: { type: "array", items: { type: "string", enum: ["l0", "l1", "l2"] }, description: "Optional layer override" },
+          pathPrefix: { type: "string", description: "Optional path prefix such as archive or memory/2026" },
+          limit: { type: "number", description: "Optional max nodes" },
+        },
+      },
+      async execute(_toolCallId: string, params: Record<string, unknown>) {
+        const result = await client.browseRecordTree({
+          tenantId: config.tenantId,
+          partitions: normalizePartitions(params.partitions, config.recall.preAnswer.partitions),
+          layers: normalizeLayers(params.layers, ["l0", "l1", "l2"]),
+          pathPrefix: typeof params.pathPrefix === "string" ? params.pathPrefix : undefined,
+          limit: normalizeLimit(params.limit, 50),
+        });
+        const lines = [
+          `path: ${result.pathPrefix || "/"}`,
+          `nodes: ${result.items.length}`,
+          `matchedRecords: ${result.summary?.totalMatchedRecords ?? 0}`,
+        ];
+        for (const [index, item] of result.items.slice(0, 12).entries()) {
+          lines.push(`${index + 1}. ${item.kind === "dir" ? "[dir]" : "[file]"} ${item.path} records=${item.recordCount}`);
+        }
+        return content(lines.join("\n"), { result });
+      },
+    },
+  );
+
+  api.registerTool(
+    {
       name: "ctx_list",
       description: "Browse ContextHub records with structural filters when the agent does not yet know a recordId.",
       parameters: {

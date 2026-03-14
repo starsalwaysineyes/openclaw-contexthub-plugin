@@ -188,6 +188,29 @@ function parseReadArgs(args: string | undefined): {
   };
 }
 
+function parseTreeArgs(
+  args: string | undefined,
+  defaults: { partitions: string[]; layers: RecallLayer[]; limit: number },
+): {
+  partitions: string[];
+  layers: RecallLayer[];
+  pathPrefix?: string;
+  limit: number;
+  json: boolean;
+} {
+  const rawInput = args?.trim() || "";
+  const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
+  const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
+  const parts = input ? input.split("::").map((item) => item.trim()) : [];
+  return {
+    partitions: parts[0] ? parts[0].split(",").map((item) => item.trim()).filter(Boolean) : defaults.partitions,
+    layers: parts[1] ? parts[1].split(",").map((item) => item.trim().toLowerCase()).filter(Boolean) as RecallLayer[] : defaults.layers,
+    pathPrefix: parts[2] || undefined,
+    limit: parts[3] ? Number(parts[3]) : defaults.limit,
+    json,
+  };
+}
+
 function parseListArgs(
   args: string | undefined,
   defaults: { partitions: string[]; layers: RecallLayer[]; limit: number },
@@ -316,6 +339,16 @@ function formatImportFileSummary(result: any): string {
   ].join("\n");
 }
 
+function formatTreeSummary(result: any): string {
+  const items = result.items ?? [];
+  const summary = result.summary ?? {};
+  const lines = [`path: ${result.pathPrefix || "/"}`, `nodes: ${items.length}`, `matchedRecords: ${summary.totalMatchedRecords ?? 0}`];
+  for (const [index, item] of items.slice(0, 10).entries()) {
+    lines.push(`${index + 1}. ${item.kind === "dir" ? "[dir]" : "[file]"} ${item.path} records=${item.recordCount}`);
+  }
+  return lines.join("\n");
+}
+
 function formatListSummary(result: any): string {
   const items = result.items ?? [];
   const page = result.page ?? {};
@@ -389,6 +422,7 @@ function formatCtxHelp(): string {
     "ctx commands:",
     "- /ctx q <query> [:: partitions] [:: layers] [:: limit] [:: rerank] [--json]",
     "- /ctx g <pattern> [:: partitions] [:: layers] [:: limit] [:: regex] [:: caseSensitive] [--json]",
+    "- /ctx t [:: partitions] [:: layers] [:: pathPrefix] [:: limit] [--json]",
     "- /ctx ls [:: partitions] [:: layers] [:: titleContains] [:: sourcePathPrefix] [:: limit] [--json]",
     "- /ctx r <recordId> [:: fromLine] [:: limit] [--json]",
     "- /ctx p",
@@ -455,6 +489,21 @@ export function registerPluginCommands(params: {
               caseSensitive: parsed.caseSensitive,
             });
             return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatGrepSummary(result));
+          }
+          case "t": {
+            const parsed = parseTreeArgs(rest, {
+              partitions: config.recall.preAnswer.partitions,
+              layers: ["l0", "l1", "l2"],
+              limit: 50,
+            });
+            const result = await client.browseRecordTree({
+              tenantId: config.tenantId,
+              partitions: parsed.partitions,
+              layers: parsed.layers,
+              pathPrefix: parsed.pathPrefix,
+              limit: parsed.limit,
+            });
+            return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatTreeSummary(result));
           }
           case "ls": {
             const parsed = parseListArgs(rest, {

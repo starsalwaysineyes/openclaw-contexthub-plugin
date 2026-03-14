@@ -167,6 +167,57 @@ function parseUploadLastSessionArgs(args: string | undefined, defaultPartitionKe
   };
 }
 
+function parseReadArgs(args: string | undefined): {
+  recordId: string;
+  fromLine: number;
+  limit: number;
+  json: boolean;
+} {
+  const rawInput = args?.trim() || "";
+  if (!rawInput) throw new Error("usage: /contexthub-read <recordId> [:: fromLine] [:: limit] [--json]");
+  const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
+  const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
+  const parts = input.split("::").map((item) => item.trim());
+  const recordId = parts[0];
+  if (!recordId) throw new Error("recordId is required");
+  return {
+    recordId,
+    fromLine: parts[1] ? Number(parts[1]) : 1,
+    limit: parts[2] ? Number(parts[2]) : 80,
+    json,
+  };
+}
+
+function parseGrepArgs(
+  args: string | undefined,
+  defaults: { partitions: string[]; layers: RecallLayer[]; limit: number },
+): {
+  pattern: string;
+  partitions: string[];
+  layers: RecallLayer[];
+  limit: number;
+  regex: boolean;
+  caseSensitive: boolean;
+  json: boolean;
+} {
+  const rawInput = args?.trim() || "";
+  if (!rawInput) throw new Error("usage: /contexthub-grep <pattern> [:: partitions] [:: layers] [:: limit] [:: regex] [:: caseSensitive] [--json]");
+  const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
+  const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
+  const parts = input.split("::").map((item) => item.trim());
+  const pattern = parts[0];
+  if (!pattern) throw new Error("pattern is required");
+  return {
+    pattern,
+    partitions: parts[1] ? parts[1].split(",").map((item) => item.trim()).filter(Boolean) : defaults.partitions,
+    layers: parts[2] ? parts[2].split(",").map((item) => item.trim().toLowerCase()).filter(Boolean) as RecallLayer[] : defaults.layers,
+    limit: parts[3] ? Number(parts[3]) : defaults.limit,
+    regex: parts[4] ? ["1", "true", "yes", "on", "regex"].includes(parts[4].toLowerCase()) : false,
+    caseSensitive: parts[5] ? ["1", "true", "yes", "on", "case", "sensitive"].includes(parts[5].toLowerCase()) : false,
+    json,
+  };
+}
+
 function truncate(value: string, limit = 220): string {
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length <= limit ? normalized : `${normalized.slice(0, limit - 1)}...`;
@@ -238,6 +289,32 @@ function formatImportFileSummary(result: any): string {
     `partition: ${result.record.partitionKey}`,
     `derivation: ${result.derivation.status}`,
   ].join("\n");
+}
+
+function formatReadSummary(result: any): string {
+  const lines = [
+    `read: [${result.record.layer}] ${result.record.title}`,
+    `recordId: ${result.record.id}`,
+    `range: ${result.fromLine}-${result.fromLine + result.returnedLines - 1} / ${result.totalLines}`,
+    `hasMore: ${Boolean(result.hasMore)}`,
+  ];
+  for (const item of result.items ?? []) {
+    lines.push(`${item.lineNumber}: ${item.text}`);
+  }
+  return lines.join("\n");
+}
+
+function formatGrepSummary(result: any): string {
+  const search = result.search ?? {};
+  const lines = [
+    `grep: pattern=${search.pattern ?? ""} regex=${Boolean(search.regex)} caseSensitive=${Boolean(search.caseSensitive)}`,
+    `scope: scannedRecords=${search.scannedRecords ?? 0} matchedRecords=${search.matchedRecords ?? 0} returnedMatches=${search.returnedMatches ?? 0}`,
+  ];
+  for (const [index, item] of (result.items ?? []).slice(0, 8).entries()) {
+    lines.push(`${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey}) line ${item.lineNumber}`);
+    lines.push(`   ${truncate(String(item.text ?? ""), 180)}`);
+  }
+  return lines.join("\n");
 }
 
 function formatImportPresetSummary(result: any): string {
@@ -338,6 +415,52 @@ export function registerPluginCommands(params: {
         lines.push(`- ${name}: ${preset.rootPath} -> ${preset.partitionKey}/${preset.layer}`);
       }
       return textReply(lines.join("\n"));
+    },
+  });
+
+  api.registerCommand({
+    name: "contexthub-read",
+    description: "Read one record as numbered lines: /contexthub-read <recordId> [:: fromLine] [:: limit] [--json]",
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: async (ctx: PluginCommandContext) => {
+      try {
+        const parsed = parseReadArgs(ctx.args);
+        const result = await client.readRecordLines(parsed.recordId, parsed.fromLine, parsed.limit);
+        if (parsed.json) return textReply(JSON.stringify(result, null, 2));
+        return textReply(formatReadSummary(result));
+      } catch (error) {
+        return textReply(String(error), true);
+      }
+    },
+  });
+
+  api.registerCommand({
+    name: "contexthub-grep",
+    description: "Search record text with line numbers: /contexthub-grep <pattern> [:: partitions] [:: layers] [:: limit] [:: regex] [:: caseSensitive] [--json]",
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: async (ctx: PluginCommandContext) => {
+      try {
+        const parsed = parseGrepArgs(ctx.args, {
+          partitions: config.recall.preAnswer.partitions,
+          layers: ["l0", "l1", "l2"],
+          limit: 20,
+        });
+        const result = await client.grep({
+          tenantId: config.tenantId,
+          pattern: parsed.pattern,
+          partitions: parsed.partitions,
+          layers: parsed.layers,
+          limit: parsed.limit,
+          regex: parsed.regex,
+          caseSensitive: parsed.caseSensitive,
+        });
+        if (parsed.json) return textReply(JSON.stringify(result, null, 2));
+        return textReply(formatGrepSummary(result));
+      } catch (error) {
+        return textReply(String(error), true);
+      }
     },
   });
 

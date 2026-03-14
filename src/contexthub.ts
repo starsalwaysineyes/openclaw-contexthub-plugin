@@ -1,4 +1,4 @@
-import type { DerivationJob, QueryRequest, QueryResponse, RecordLink } from "./types.js";
+import type { DerivationJob, GrepRequest, GrepResponse, QueryRequest, QueryResponse, RecordLink, RecordReadResponse } from "./types.js";
 
 export interface ContextHubHttpClientOptions {
   baseUrl: string;
@@ -10,6 +10,14 @@ export class ContextHubHttpClient {
 
   async query(payload: QueryRequest): Promise<QueryResponse> {
     return this.request<QueryResponse>("POST", "/v1/query", payload);
+  }
+
+  async grep(payload: GrepRequest): Promise<GrepResponse> {
+    return this.request<GrepResponse>("POST", "/v1/records/grep", payload);
+  }
+
+  async readRecordLines(recordId: string, fromLine = 1, limit = 80): Promise<RecordReadResponse> {
+    return this.request<RecordReadResponse>("GET", `/v1/records/${recordId}/lines?from_line=${fromLine}&limit=${limit}`);
   }
 
   async importResource(payload: Record<string, unknown>): Promise<Record<string, unknown>> {

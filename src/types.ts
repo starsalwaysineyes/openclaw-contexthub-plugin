@@ -50,6 +50,16 @@ export interface QueryRequest {
   rerank: boolean;
 }
 
+export interface GrepRequest {
+  tenantId: string;
+  pattern: string;
+  partitions: string[];
+  layers: RecallLayer[];
+  limit: number;
+  regex?: boolean;
+  caseSensitive?: boolean;
+}
+
 export interface QueryItem {
   recordId: string;
   title: string;
@@ -65,6 +75,37 @@ export interface QueryItem {
 export interface QueryResponse {
   items: QueryItem[];
   retrieval?: Record<string, unknown>;
+}
+
+export interface RecordReadLine {
+  lineNumber: number;
+  text: string;
+}
+
+export interface RecordReadResponse {
+  record: Record<string, unknown>;
+  fromLine: number;
+  limit: number;
+  totalLines: number;
+  returnedLines: number;
+  hasMore: boolean;
+  items: RecordReadLine[];
+}
+
+export interface GrepHit {
+  recordId: string;
+  title: string;
+  layer: RecallLayer;
+  partitionKey: string;
+  lineNumber: number;
+  text: string;
+  matchCount: number;
+  matchRanges: Array<{ start: number; end: number }>;
+}
+
+export interface GrepResponse {
+  items: GrepHit[];
+  search?: Record<string, unknown>;
 }
 
 export interface DerivationJob {

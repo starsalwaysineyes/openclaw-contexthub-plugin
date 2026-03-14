@@ -53,7 +53,9 @@ Implemented in this repo now:
 - plugin commands:
   - `/contexthub-recall`
   - `/contexthub-query <query> [:: partitions] [:: layers] [:: limit] [:: rerank] [--json]`
+  - `/contexthub-grep <pattern> [:: partitions] [:: layers] [:: limit] [:: regex] [:: caseSensitive] [--json]`
   - `/contexthub-presets`
+  - `/contexthub-read <recordId> [:: fromLine] [:: limit] [--json]`
   - `/contexthub-last-session`
   - `/contexthub-upload-last-session <partitionKey|-> [:: title]`
   - `/contexthub-save <layer> <partitionKey|-> <title> :: <text>`
@@ -129,7 +131,7 @@ An agent needs four practical abilities:
 3. upload raw session/doc/file content when a human wants raw retrieval
 4. inspect async jobs and links when something looks wrong
 
-This repo now covers all four at a first-pass level, plus preset-based batch import flow and explicit last-session upload.
+This repo now covers all four at a first-pass level, plus preset-based batch import flow, explicit last-session upload, and the first line-oriented read/grep bridge to ContextHub.
 
 ## Product rule that should stay
 

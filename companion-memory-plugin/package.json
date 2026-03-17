@@ -1,7 +1,7 @@
 {
-  "name": "openclaw-contexthub-plugin",
+  "name": "openclaw-contexthub-memory-plugin",
   "version": "0.1.0",
-  "description": "OpenClaw plugin for ContextHub recall, write, and import workflows",
+  "description": "Companion OpenClaw memory-slot plugin for ContextHub",
   "author": "MemTensor",
   "license": "MIT",
   "type": "module",
@@ -10,11 +10,10 @@
     "index.ts",
     "src",
     "README.md",
-    ".env.example",
     "tsconfig.json"
   ],
   "openclaw": {
-    "id": "openclaw-contexthub-plugin",
+    "id": "openclaw-contexthub-memory-plugin",
     "extensions": [
       "./index.ts"
     ],
@@ -22,8 +21,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "check": "tsc --noEmit",
-    "smoke:ctx": "tsc -p tsconfig.json && node dist/smoke-ctx.js"
+    "check": "tsc --noEmit -p tsconfig.json",
+    "smoke": "tsc -p tsconfig.json && node dist/smoke.js"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -48,7 +48,7 @@ Implemented in this repo now:
 
 - minimal `before_agent_start` hook
 - `agent_end` cache of the last completed session transcript (no automatic write)
-- ContextHub HTTP client for `query`, `grep`, `readRecordLines`, `importResource`, `commitSession`, `getDerivationJob`, `listDerivationJobs`, `redriveDerivationJobs`, `listRecordLinks`
+- ContextHub HTTP client for `query`, `grep`, `getRecord`, `updateRecord`, `editRecordText`, `applyRecordPatch`, `readRecordLines`, `importResource`, `commitSession`, `getDerivationJob`, `listDerivationJobs`, `redriveDerivationJobs`, `listRecordLinks`
 - config resolution from plugin config + env
 - agent-facing tools:
   - `ctx_query`
@@ -57,6 +57,8 @@ Implemented in this repo now:
   - `ctx_read`
   - `ctx_grep`
   - `ctx_write_text` (optional)
+  - `ctx_edit_text` (optional)
+  - `ctx_apply_patch` (optional)
   - `ctx_import_file` (optional)
   - `ctx_import_preset` (optional)
   - `ctx_job`
@@ -65,10 +67,14 @@ Implemented in this repo now:
   - `ctx_links`
 - preferred short operator entrypoint:
   - `/ctx q ...`
+  - `/ctx ms ...` (runtime-memory style search; mirrors the companion `memory_search` contract)
   - `/ctx g ...`
   - `/ctx t ...`
   - `/ctx ls ...`
   - `/ctx r ...`
+  - `/ctx mg ...` (runtime-memory style read; accepts `record:<recordId>` or `recordId#L<number>`)
+  - `/ctx e ...` (targeted replace on existing record text)
+  - `/ctx ap ...` (apply unified patch on existing record text)
   - `/ctx s ...`
   - `/ctx c ...`
   - `/ctx f ...`
@@ -85,9 +91,37 @@ Implemented in this repo now:
   - `/contexthub-grep <pattern> [:: partitions] [:: layers] [:: tags] [:: limit] [:: regex] [:: caseSensitive] [--json]`
   - `/contexthub-presets`
   - `/contexthub-read <recordId> [:: fromLine] [:: limit] [--json]`
+  - `/contexthub-edit <recordId> :: <matchText> :: <replaceText> [:: replaceAll] [--json]`
+  - `/contexthub-apply-patch <recordId> :: <patch> [--json]`
   - `/contexthub-last-session`
+
+## Local command smoke
+
+For no-restart local validation of the registered `/ctx` router and its parity with the long-form query command:
+
+```bash
+npm run smoke:ctx -- \
+  --base-url http://127.0.0.1:4041 \
+  --tenant-id tenant_... \
+  --partitions memory,project-contexthub \
+  --layers l0 \
+  --limit 6 \
+  --rerank true
+```
+
+What it checks:
+
+- registers the plugin locally and captures the command registry without loading it into the gateway
+- verifies `/ctx`, `/contexthub-query`, `/contexthub-recall`, `/contexthub-edit`, and `/contexthub-apply-patch` are present
+- verifies `/ctx ms`, `/ctx mg`, `/ctx e`, and `/ctx ap` show up in the short help surface
+- runs a real `/ctx q ... --json` query against ContextHub
+- runs a real `/ctx ms ... --json` runtime-memory alias against the same backend/scope
+- runs the equivalent `/contexthub-query ... --json` request and checks first-hit parity
+- follows up with `/ctx r <recordId>` and `/ctx mg record:<recordId>` to confirm both short paths read the same record lines they just surfaced
   - `/contexthub-upload-last-session <partitionKey|-> [:: title]`
   - `/contexthub-save <layer> <partitionKey|-> <title> :: <text>`
+  - `/contexthub-edit <recordId> :: <matchText> :: <replaceText> [:: replaceAll] [--json]`
+  - `/contexthub-apply-patch <recordId> :: <patch> [--json]`
   - `/contexthub-commit <partitionKey|-> <summary> [:: memoryTitle :: memoryText]`
   - `/contexthub-import-file <layer> <partitionKey|-> <filePath> [:: title]`
   - `/contexthub-import-preset <presetName> [limit] [--dry-run]`

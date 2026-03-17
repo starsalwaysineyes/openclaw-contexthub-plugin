@@ -1,0 +1,38 @@
+{
+  "id": "openclaw-contexthub-memory-plugin",
+  "name": "OpenClaw ContextHub Memory Plugin",
+  "description": "ContextHub-backed memory_search and memory_get for OpenClaw memory slot integration.",
+  "kind": "memory",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+      "baseUrl": { "type": "string" },
+      "token": { "type": "string" },
+      "tenantId": { "type": "string" },
+      "search": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "partitions": { "type": "array", "items": { "type": "string" } },
+          "layers": { "type": "array", "items": { "type": "string", "enum": ["l0", "l1", "l2"] } },
+          "limit": { "type": "number" },
+          "rerank": { "type": "boolean" }
+        }
+      },
+      "read": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "defaultLines": { "type": "number" },
+          "maxLines": { "type": "number" }
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "baseUrl": { "label": "ContextHub Base URL", "placeholder": "http://127.0.0.1:4040" },
+    "token": { "label": "ContextHub Token", "sensitive": true },
+    "tenantId": { "label": "Tenant ID" }
+  }
+}

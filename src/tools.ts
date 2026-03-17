@@ -292,6 +292,70 @@ export function registerPluginTools(params: {
 
   api.registerTool(
     {
+      name: "ctx_edit_text",
+      description: "Edit one existing ContextHub record by replacing text. Fails if match is ambiguous unless replaceAll=true.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          recordId: { type: "string", description: "Target record ID" },
+          matchText: { type: "string", description: "Exact text to find" },
+          replaceText: { type: "string", description: "Replacement text" },
+          replaceAll: { type: "boolean", description: "Replace all matches" },
+        },
+        required: ["recordId", "matchText", "replaceText"],
+      },
+      async execute(_toolCallId: string, params: Record<string, unknown>) {
+        const recordId = String(params.recordId ?? "").trim();
+        const matchText = String(params.matchText ?? "");
+        const replaceText = String(params.replaceText ?? "");
+        if (!recordId || !matchText) throw new Error("recordId and matchText are required");
+        const result = await client.editRecordText(recordId, {
+          matchText,
+          replaceText,
+          replaceAll: Boolean(params.replaceAll),
+        });
+        const lines = [
+          `edited [${result.record.layer}] ${result.record.title} (${result.record.id})`,
+          `matched=${result.edit.matched} replaced=${result.edit.replaced} replaceAll=${Boolean(result.edit.replaceAll)}`,
+        ];
+        return content(lines.join("\n"), { result });
+      },
+    },
+    { optional: true },
+  );
+
+  api.registerTool(
+    {
+      name: "ctx_apply_patch",
+      description: "Apply a unified patch text block to one ContextHub record.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          recordId: { type: "string", description: "Target record ID" },
+          patch: { type: "string", description: "Unified patch content" },
+        },
+        required: ["recordId", "patch"],
+      },
+      async execute(_toolCallId: string, params: Record<string, unknown>) {
+        const recordId = String(params.recordId ?? "").trim();
+        const patch = String(params.patch ?? "");
+        if (!recordId || !patch.trim()) throw new Error("recordId and patch are required");
+        const result = await client.applyRecordPatch(recordId, { patch });
+        const lines = [
+          `patched [${result.record.layer}] ${result.record.title} (${result.record.id})`,
+          `hunks=${result.patch.hunks}`,
+          ...(result.patch.applied ?? []).slice(0, 8).map((item) => `- hunk#${item.index} startLine=${item.startLine} -${item.removedLines} +${item.addedLines}`),
+        ];
+        return content(lines.join("\n"), { result });
+      },
+    },
+    { optional: true },
+  );
+
+  api.registerTool(
+    {
       name: "ctx_import_file",
       description: "Explicitly import one local file into ContextHub at a chosen layer. Use when an agent intentionally wants to upload a file path.",
       parameters: {

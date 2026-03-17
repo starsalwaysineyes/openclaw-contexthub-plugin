@@ -171,14 +171,56 @@ export interface RecordReadLine {
   text: string;
 }
 
+export interface ContextHubRecord {
+  id: string;
+  tenantId: string;
+  partitionKey: string;
+  type: string;
+  layer: RecallLayer;
+  title: string;
+  text: string;
+  source?: Record<string, unknown> | null;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  manualSummary?: string;
+  importance?: number;
+  pinned?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface RecordReadResponse {
-  record: Record<string, unknown>;
+  record: ContextHubRecord;
   fromLine: number;
   limit: number;
   totalLines: number;
   returnedLines: number;
   hasMore: boolean;
   items: RecordReadLine[];
+}
+
+export interface RecordEditResponse {
+  record: ContextHubRecord;
+  edit: {
+    matchText: string;
+    replaceText: string;
+    replaceAll: boolean;
+    matched: number;
+    replaced: number;
+  };
+}
+
+export interface RecordApplyPatchResponse {
+  record: ContextHubRecord;
+  patch: {
+    hunks: number;
+    applied: Array<{
+      index: number;
+      startLine: number;
+      removedLines: number;
+      addedLines: number;
+    }>;
+  };
 }
 
 export interface GrepHit {

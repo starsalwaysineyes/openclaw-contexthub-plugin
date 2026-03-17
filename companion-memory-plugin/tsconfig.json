@@ -10,5 +10,5 @@
     "declaration": true,
     "esModuleInterop": true
   },
-  "include": ["index.ts", "smoke-ctx.ts", "src/**/*.ts", "src/**/*.d.ts"]
+  "include": ["index.ts", "smoke.ts", "src/**/*.ts", "src/**/*.d.ts"]
 }

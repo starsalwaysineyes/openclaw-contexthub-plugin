@@ -12,6 +12,9 @@ import type {
   ListRecordsResponse,
   QueryRequest,
   QueryResponse,
+  ContextHubRecord,
+  RecordApplyPatchResponse,
+  RecordEditResponse,
   RecordLink,
   RecordReadResponse,
 } from "./types.js";
@@ -38,6 +41,25 @@ export class ContextHubHttpClient {
 
   async browseRecordTree(payload: BrowseTreeRequest): Promise<BrowseTreeResponse> {
     return this.request<BrowseTreeResponse>("POST", "/v1/records/tree", payload);
+  }
+
+  async getRecord(recordId: string): Promise<ContextHubRecord> {
+    return this.request<ContextHubRecord>("GET", `/v1/records/${recordId}`);
+  }
+
+  async updateRecord(recordId: string, payload: Record<string, unknown>): Promise<ContextHubRecord> {
+    return this.request<ContextHubRecord>("PATCH", `/v1/records/${recordId}`, payload);
+  }
+
+  async editRecordText(
+    recordId: string,
+    payload: { matchText: string; replaceText: string; replaceAll?: boolean },
+  ): Promise<RecordEditResponse> {
+    return this.request<RecordEditResponse>("POST", `/v1/records/${recordId}/edit`, payload);
+  }
+
+  async applyRecordPatch(recordId: string, payload: { patch: string }): Promise<RecordApplyPatchResponse> {
+    return this.request<RecordApplyPatchResponse>("POST", `/v1/records/${recordId}/apply_patch`, payload);
   }
 
   async readRecordLines(recordId: string, fromLine = 1, limit = 80): Promise<RecordReadResponse> {

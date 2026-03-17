@@ -23,6 +23,40 @@ function splitHead(input: string): { head: string; rest: string } {
   };
 }
 
+function buildSyntheticRecordPath(recordId: string): string {
+  return `record:${recordId}`;
+}
+
+function pickSourcePath(item: Record<string, any>): string | undefined {
+  const source = item.source ?? {};
+  for (const key of ["relativePath", "path"]) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function parseRecordLocator(raw: string): { path: string; recordId: string; hashLine?: number } {
+  const trimmed = raw.trim();
+  if (!trimmed) throw new Error("record path is required");
+
+  const hashIndex = trimmed.indexOf("#L");
+  const basePath = hashIndex >= 0 ? trimmed.slice(0, hashIndex).trim() : trimmed;
+  const hashLineRaw = hashIndex >= 0 ? Number(trimmed.slice(hashIndex + 2).trim()) : undefined;
+  const hashLine = Number.isFinite(hashLineRaw) ? Math.max(1, Math.floor(Number(hashLineRaw))) : undefined;
+
+  const recordId = basePath.startsWith("record:")
+    ? basePath.slice("record:".length).trim()
+    : basePath;
+  if (!recordId) throw new Error("recordId is required");
+
+  return {
+    path: buildSyntheticRecordPath(recordId),
+    recordId,
+    hashLine,
+  };
+}
+
 function parseSaveArgs(args: string | undefined, defaultPartitionKey?: string): {
   layer: RecallLayer;
   partitionKey: string;
@@ -190,6 +224,72 @@ function parseReadArgs(args: string | undefined): {
     limit: parts[2] ? Number(parts[2]) : 80,
     json,
   };
+}
+
+function parseRuntimeReadArgs(args: string | undefined): {
+  path: string;
+  recordId: string;
+  fromLine: number;
+  limit: number;
+  json: boolean;
+} {
+  const rawInput = args?.trim() || "";
+  if (!rawInput) {
+    throw new Error("usage: /ctx mg <record:<recordId>|recordId[#LfromLine]> [:: fromLine] [:: limit] [--json]");
+  }
+  const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
+  const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
+  const parts = input.split("::").map((item) => item.trim());
+  const locator = parseRecordLocator(parts[0] || "");
+  return {
+    path: locator.path,
+    recordId: locator.recordId,
+    fromLine: parts[1] ? Number(parts[1]) : (locator.hashLine ?? 1),
+    limit: parts[2] ? Number(parts[2]) : 80,
+    json,
+  };
+}
+
+function parseEditArgs(args: string | undefined): {
+  recordId: string;
+  matchText: string;
+  replaceText: string;
+  replaceAll: boolean;
+  json: boolean;
+} {
+  const rawInput = args?.trim() || "";
+  if (!rawInput) throw new Error("usage: /contexthub-edit <recordId> :: <matchText> :: <replaceText> [:: replaceAll] [--json]");
+  const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
+  const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
+  const parts = input.split("::").map((item) => item.trim());
+  if (parts.length < 3) {
+    throw new Error("usage: /contexthub-edit <recordId> :: <matchText> :: <replaceText> [:: replaceAll] [--json]");
+  }
+  const recordId = parts[0];
+  const matchText = parts[1];
+  const replaceText = parts[2];
+  if (!recordId || !matchText) throw new Error("recordId and matchText are required");
+  const replaceAll = parts[3]
+    ? ["1", "true", "yes", "on", "all", "replace-all"].includes(parts[3].toLowerCase())
+    : false;
+  return { recordId, matchText, replaceText, replaceAll, json };
+}
+
+function parseApplyPatchArgs(args: string | undefined): {
+  recordId: string;
+  patch: string;
+  json: boolean;
+} {
+  const rawInput = args?.trim() || "";
+  if (!rawInput) throw new Error("usage: /contexthub-apply-patch <recordId> :: <patch> [--json]");
+  const json = /(?:^|\s)--json(?:\s|$)/.test(rawInput);
+  const input = rawInput.replace(/(?:^|\s)--json(?:\s|$)/g, " ").trim();
+  const marker = input.indexOf("::");
+  if (marker < 0) throw new Error("usage: /contexthub-apply-patch <recordId> :: <patch> [--json]");
+  const recordId = input.slice(0, marker).trim();
+  const patch = input.slice(marker + 2).trim();
+  if (!recordId || !patch) throw new Error("recordId and patch are required");
+  return { recordId, patch, json };
 }
 
 function parseTreeArgs(
@@ -392,6 +492,57 @@ function formatQuerySummary(payload: {
   return lines.join("\n");
 }
 
+function normalizeRuntimeSearchItems(items: Array<Record<string, any>>): Array<Record<string, any>> {
+  const deduped = new Map<string, Record<string, any>>();
+  for (const item of items) {
+    const recordId = String(item.recordId ?? "");
+    if (!recordId) continue;
+    const existing = deduped.get(recordId);
+    if (!existing || Number(item.score ?? 0) > Number(existing.score ?? 0)) {
+      deduped.set(recordId, item);
+    }
+  }
+  return [...deduped.values()]
+    .sort((a, b) => Number(b.score ?? 0) - Number(a.score ?? 0))
+    .map((item) => ({
+      path: buildSyntheticRecordPath(String(item.recordId)),
+      recordId: item.recordId,
+      title: item.title,
+      layer: item.layer,
+      partitionKey: item.partitionKey,
+      score: item.score,
+      sourcePath: pickSourcePath(item),
+      snippet: item.snippet,
+      tags: item.tags ?? [],
+    }));
+}
+
+function formatRuntimeSearchSummary(query: string, items: Array<Record<string, any>>): string {
+  const lines = [`query: ${query}`, `hits: ${items.length}`];
+  for (const [index, item] of items.entries()) {
+    lines.push(`${index + 1}. ${item.path} score=${Number(item.score ?? 0).toFixed(3)} [${item.layer}] ${item.title} (${item.partitionKey})`);
+    if (item.sourcePath) lines.push(`   source=${item.sourcePath}`);
+    lines.push(`   ${truncate(String(item.snippet ?? ""), 220)}`);
+  }
+  return lines.join("\n");
+}
+
+function formatRuntimeReadSummary(path: string, result: any): string {
+  const sourcePath = String(result.record?.source?.relativePath ?? result.record?.source?.path ?? "").trim();
+  const endLine = result.returnedLines > 0 ? result.fromLine + result.returnedLines - 1 : result.fromLine;
+  const lines = [
+    `record: [${result.record.layer}] ${result.record.title} (${result.record.partitionKey})`,
+    `path: ${path}`,
+    ...(sourcePath ? [`source: ${sourcePath}`] : []),
+    `range: ${result.fromLine}-${endLine} / ${result.totalLines}`,
+    `hasMore: ${Boolean(result.hasMore)}`,
+  ];
+  for (const item of result.items ?? []) {
+    lines.push(`${item.lineNumber}: ${item.text}`);
+  }
+  return lines.join("\n");
+}
+
 function formatSaveSummary(result: any): string {
   return [
     `saved: [${result.record.layer}] ${result.record.title}`,
@@ -457,6 +608,33 @@ function formatReadSummary(result: any): string {
   ];
   for (const item of result.items ?? []) {
     lines.push(`${item.lineNumber}: ${item.text}`);
+  }
+  return lines.join("\n");
+}
+
+function formatEditSummary(result: any): string {
+  return [
+    `edited: [${result.record.layer}] ${result.record.title}`,
+    `recordId: ${result.record.id}`,
+    `partition: ${result.record.partitionKey}`,
+    `matched: ${result.edit?.matched ?? 0}`,
+    `replaced: ${result.edit?.replaced ?? 0}`,
+    `replaceAll: ${Boolean(result.edit?.replaceAll)}`,
+  ].join("\n");
+}
+
+function formatApplyPatchSummary(result: any): string {
+  const applied = Array.isArray(result.patch?.applied) ? result.patch.applied : [];
+  const lines = [
+    `patched: [${result.record.layer}] ${result.record.title}`,
+    `recordId: ${result.record.id}`,
+    `partition: ${result.record.partitionKey}`,
+    `hunks: ${result.patch?.hunks ?? applied.length}`,
+  ];
+  for (const item of applied.slice(0, 8)) {
+    lines.push(
+      `- hunk#${item.index} startLine=${item.startLine} -${item.removedLines} +${item.addedLines}`,
+    );
   }
   return lines.join("\n");
 }
@@ -539,10 +717,14 @@ function formatCtxHelp(): string {
   return [
     "ctx commands:",
     "- /ctx q <query> [:: partitions] [:: layers] [:: tags] [:: limit] [:: rerank] [--json]",
+    "- /ctx ms <query> [:: partitions] [:: layers] [:: tags] [:: limit] [:: rerank] [--json]",
     "- /ctx g <pattern> [:: partitions] [:: layers] [:: tags] [:: limit] [:: regex] [:: caseSensitive] [--json]",
     "- /ctx t [:: partitions] [:: layers] [:: tags] [:: pathPrefix] [:: limit] [--json]",
     "- /ctx ls [:: partitions] [:: layers] [:: tags] [:: titleContains] [:: sourcePathPrefix] [:: limit] [--json]",
     "- /ctx r <recordId> [:: fromLine] [:: limit] [--json]",
+    "- /ctx mg <record:<recordId>|recordId[#LfromLine]> [:: fromLine] [:: limit] [--json]",
+    "- /ctx e <recordId> :: <matchText> :: <replaceText> [:: replaceAll] [--json]",
+    "- /ctx ap <recordId> :: <patch> [--json]",
     "- /ctx p",
     "- /ctx s <layer> <partitionKey|-> <title> :: <text>",
     "- /ctx c <partitionKey|-> <summary> [:: memoryTitle :: memoryText]",
@@ -593,6 +775,31 @@ export function registerPluginCommands(params: {
               rerank: parsed.rerank,
             });
             return textReply(parsed.json ? JSON.stringify({ query: parsed, result }, null, 2) : formatQuerySummary({ query: parsed, result }));
+          }
+          case "ms": {
+            const parsed = parseQueryArgs(rest, {
+              partitions: config.recall.preAnswer.partitions,
+              layers: config.recall.preAnswer.layers,
+              limit: config.recall.preAnswer.limit,
+              rerank: config.recall.preAnswer.rerank,
+            });
+            const result = await client.query({
+              tenantId: config.tenantId,
+              query: parsed.query,
+              partitions: parsed.partitions,
+              layers: parsed.layers,
+              tags: parsed.tags,
+              limit: parsed.limit,
+              rerank: parsed.rerank,
+            });
+            const memorySearch = {
+              results: normalizeRuntimeSearchItems(result.items ?? []),
+              scope: result.scope,
+              retrieval: result.retrieval,
+            };
+            return textReply(parsed.json
+              ? JSON.stringify({ query: parsed, result, memorySearch }, null, 2)
+              : formatRuntimeSearchSummary(parsed.query, memorySearch.results));
           }
           case "g": {
             const parsed = parseGrepArgs(rest, {
@@ -650,6 +857,25 @@ export function registerPluginCommands(params: {
             const parsed = parseReadArgs(rest);
             const result = await client.readRecordLines(parsed.recordId, parsed.fromLine, parsed.limit);
             return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatReadSummary(result));
+          }
+          case "mg": {
+            const parsed = parseRuntimeReadArgs(rest);
+            const result = await client.readRecordLines(parsed.recordId, parsed.fromLine, parsed.limit);
+            return textReply(parsed.json ? JSON.stringify({ path: parsed.path, result }, null, 2) : formatRuntimeReadSummary(parsed.path, result));
+          }
+          case "e": {
+            const parsed = parseEditArgs(rest);
+            const result = await client.editRecordText(parsed.recordId, {
+              matchText: parsed.matchText,
+              replaceText: parsed.replaceText,
+              replaceAll: parsed.replaceAll,
+            });
+            return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatEditSummary(result));
+          }
+          case "ap": {
+            const parsed = parseApplyPatchArgs(rest);
+            const result = await client.applyRecordPatch(parsed.recordId, { patch: parsed.patch });
+            return textReply(parsed.json ? JSON.stringify(result, null, 2) : formatApplyPatchSummary(result));
           }
           case "p":
             return textReply((() => {
@@ -868,6 +1094,44 @@ export function registerPluginCommands(params: {
         const result = await client.readRecordLines(parsed.recordId, parsed.fromLine, parsed.limit);
         if (parsed.json) return textReply(JSON.stringify(result, null, 2));
         return textReply(formatReadSummary(result));
+      } catch (error) {
+        return textReply(String(error), true);
+      }
+    },
+  });
+
+  api.registerCommand({
+    name: "contexthub-edit",
+    description: "Replace text in one record: /contexthub-edit <recordId> :: <matchText> :: <replaceText> [:: replaceAll] [--json]",
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: async (ctx: PluginCommandContext) => {
+      try {
+        const parsed = parseEditArgs(ctx.args);
+        const result = await client.editRecordText(parsed.recordId, {
+          matchText: parsed.matchText,
+          replaceText: parsed.replaceText,
+          replaceAll: parsed.replaceAll,
+        });
+        if (parsed.json) return textReply(JSON.stringify(result, null, 2));
+        return textReply(formatEditSummary(result));
+      } catch (error) {
+        return textReply(String(error), true);
+      }
+    },
+  });
+
+  api.registerCommand({
+    name: "contexthub-apply-patch",
+    description: "Apply unified patch text to one record: /contexthub-apply-patch <recordId> :: <patch> [--json]",
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: async (ctx: PluginCommandContext) => {
+      try {
+        const parsed = parseApplyPatchArgs(ctx.args);
+        const result = await client.applyRecordPatch(parsed.recordId, { patch: parsed.patch });
+        if (parsed.json) return textReply(JSON.stringify(result, null, 2));
+        return textReply(formatApplyPatchSummary(result));
       } catch (error) {
         return textReply(String(error), true);
       }

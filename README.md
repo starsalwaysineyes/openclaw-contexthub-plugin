@@ -13,6 +13,8 @@ It registers exactly two user-facing surfaces:
 
 Both use the same CLI-like grammar and can operate on:
 
+Cloud `search` now defaults to `defaultWorkspace`; add `--workspace-mode user` or `--workspace-mode default-first` only when you intentionally want a wider scope.
+
 - local filesystem paths
 - cloud `ctx://` URIs backed by the phase-1 ContextHub filesystem service
 
@@ -77,6 +79,8 @@ Example plugin config in `~/.openclaw/openclaw.json`:
 /ctx stat ctx://shiuing/defaultWorkspace --cloud
 /ctx mkdir ctx://shiuing/defaultWorkspace/tasks --cloud
 /ctx write ctx://shiuing/defaultWorkspace/tasks/today.md --text "hello" --cloud
+/ctx search "cloud cutover" --cloud
+/ctx search "phase1" --workspace-mode user --mode lexical --expansion import-tree --expansion 24040 --cloud
 /ctx grep cloud --scope-uri ctx://shiuing/defaultWorkspace --user-id shiuing --cloud
 /ctx import-tree ./memory ctx://shiuing/defaultWorkspace/memory --include '*.md' --exclude 'archive/**' --cloud
 ```

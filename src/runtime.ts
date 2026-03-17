@@ -47,6 +47,10 @@ const BOOLEAN_FLAGS = new Set([
   "no-parents",
   "create-parents",
   "no-create-parents",
+  "rerank",
+  "no-rerank",
+  "explain",
+  "no-explain",
 ]);
 
 export const HELP_TEXT = [
@@ -282,11 +286,25 @@ export class CtxRuntime {
     if (!query) throw new Error("search requires --query or a positional query");
     const scopeUri = this.optionValue(parsed, "scope-uri") || this.position(parsed, 1) || null;
     const userId = this.resolveCloudUserId(parsed, scopeUri || undefined);
+    const mode = this.optionValue(parsed, "mode") || "auto";
+    const expansions = this.optionValues(parsed, "expansion");
+    const glob = this.optionValue(parsed, "glob") || null;
+    const pathPrefix = this.optionValue(parsed, "path-prefix") || null;
+    const workspaceMode = this.optionValue(parsed, "workspace-mode") || "default-only";
+    const rerank = this.booleanOption(parsed, "rerank", "no-rerank", true);
+    const explain = this.booleanOption(parsed, "explain", "no-explain", true);
     const limit = this.numberOption(parsed, "limit", 20);
     return this.cloudRequest("POST", "/v1/fs/search", {
       userId,
       query,
       scopeUri,
+      mode,
+      expansions,
+      glob,
+      pathPrefix,
+      workspaceMode,
+      rerank,
+      explain,
       limit,
     });
   }

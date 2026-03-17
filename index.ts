@@ -1,108 +1,88 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { captureLastSession } from "./src/agent-end.js";
-import { registerPluginCommands } from "./src/commands.js";
-import { ContextHubHttpClient } from "./src/contexthub.js";
-import { resolveConfig } from "./src/config.js";
-import { registerPluginTools } from "./src/tools.js";
-import type { LastSessionCapture } from "./src/types.js";
+import type { OpenClawPluginApi, PluginCommandContext } from "openclaw/plugin-sdk";
+import { CtxRuntime, HELP_TEXT, resolveConfig } from "./src/runtime.js";
 
 const pluginConfigSchema = {
   type: "object" as const,
   additionalProperties: true,
   properties: {
-    baseUrl: { type: "string" as const, description: "ContextHub base URL" },
-    token: { type: "string" as const, description: "Optional bearer token" },
-    tenantId: { type: "string" as const, description: "ContextHub tenant ID" },
-    defaultPartitionKey: { type: "string" as const, description: "Default partition key for plugin write/import commands" },
-    recall: {
-      type: "object" as const,
-      properties: {
-        preAnswer: {
-          type: "object" as const,
-          properties: {
-            enabled: { type: "boolean" as const, description: "Enable pre-answer recall" },
-            partitions: { type: "array" as const, items: { type: "string" as const }, description: "Default partitions used by pre-answer recall" },
-            layers: { type: "array" as const, items: { type: "string" as const }, description: "Layers queried by pre-answer recall (default: l0 only)" },
-            limit: { type: "number" as const, description: "Max recall hits for one turn" },
-            rerank: { type: "boolean" as const, description: "Enable rerank on recall" },
-          },
-        },
-      },
-    },
-    importPresets: {
-      type: "object" as const,
-      additionalProperties: true,
-      description: "Optional local migration presets keyed by preset name",
-    },
+    baseUrl: { type: "string" as const, description: "ContextHub phase-1 filesystem base URL" },
+    token: { type: "string" as const, description: "Bearer token used for cloud ctx:// requests" },
+    defaultUserId: { type: "string" as const, description: "Default ctx:// userId for cloud search/glob/grep/rg when scope is omitted" },
+    localRoot: { type: "string" as const, description: "Base directory used for relative local filesystem paths" },
+    timeoutMs: { type: "number" as const, description: "HTTP timeout for cloud requests in milliseconds" },
   },
 };
 
-function buildPrependContext(items: Array<{ title: string; layer: string; snippet: string; partitionKey: string }>): string {
-  const lines = items.map((item, index) => {
-    const snippet = item.snippet.replace(/\s+/g, " ").trim();
-    return `${index + 1}. [${item.layer}] ${item.title} (${item.partitionKey}) - ${snippet}`;
-  });
-  return [
-    "## ContextHub recall",
-    "Use these recalled L0 memory pointers as supporting context. Do not treat them as unquestionable truth.",
-    ...lines,
-  ].join("\n");
+function toolContent(text: string, details?: Record<string, unknown>) {
+  return {
+    content: [{ type: "text", text }],
+    details,
+  };
+}
+
+async function runCommand(runtime: CtxRuntime, raw: string) {
+  return runtime.run(raw, { forceJson: false });
+}
+
+function extractCommandInput(ctx: PluginCommandContext): string {
+  const value = (ctx.args || ctx.commandBody || "").trim();
+  return value;
 }
 
 const plugin = {
   id: "openclaw-contexthub-plugin",
-  name: "OpenClaw ContextHub Plugin",
-  description: "Pre-answer recall plus explicit write/import bridge for ContextHub.",
+  name: "OpenClaw Ctx Plugin",
+  description: "One ctx command/tool for local filesystem and ContextHub ctx:// cloud filesystem operations.",
   kind: "integration" as const,
   configSchema: pluginConfigSchema,
   register(api: OpenClawPluginApi) {
     const config = resolveConfig((api.pluginConfig ?? {}) as Record<string, unknown>);
-    const client = new ContextHubHttpClient({ baseUrl: config.baseUrl, token: config.token });
-    const state: { lastSessionCapture: LastSessionCapture | null } = { lastSessionCapture: null };
+    const runtime = new CtxRuntime(config, api.logger);
 
-    registerPluginCommands({ api, config, client, state });
-    registerPluginTools({ api, config, client });
+    api.registerCommand({
+      name: "ctx",
+      description: "Local/cloud filesystem operator surface. Use /ctx help for examples.",
+      acceptsArgs: true,
+      requireAuth: false,
+      async handler(ctx: PluginCommandContext) {
+        try {
+          const input = extractCommandInput(ctx);
+          if (!input) return { text: HELP_TEXT };
+          const result = await runCommand(runtime, input);
+          return { text: result.text };
+        } catch (error) {
+          return { text: `ctx error: ${String(error)}`, isError: true };
+        }
+      },
+    });
 
-    api.on("before_agent_start", async (event: { prompt?: string }) => {
-      const recall = config.recall.preAnswer;
-      if (!recall.enabled) return;
-      if (!config.tenantId) {
-        api.logger.warn("contexthub-plugin: tenantId is missing; skipping recall");
-        return;
-      }
-      const prompt = event.prompt?.trim();
-      if (!prompt) return;
-
-      try {
-        const result = await client.query({
-          tenantId: config.tenantId,
-          query: prompt,
-          partitions: recall.partitions,
-          layers: recall.layers,
-          limit: recall.limit,
-          rerank: recall.rerank,
-        });
-        if (!result.items || result.items.length === 0) return;
-
-        return {
-          prependContext: buildPrependContext(
-            result.items.map((item) => ({
-              title: item.title,
-              layer: item.layer,
-              snippet: item.snippet,
-              partitionKey: item.partitionKey,
-            })),
-          ),
-        };
-      } catch (error) {
-        api.logger.warn(`contexthub-plugin: recall failed: ${String(error)}`);
-        return;
-      }
-    }, { priority: 20 });
-
-    api.on("agent_end", async (event: { messages?: unknown[]; success?: boolean; error?: string; durationMs?: number }) => {
-      state.lastSessionCapture = captureLastSession(event);
-    }, { priority: 10 });
+    api.registerTool({
+      name: "ctx",
+      description: "CLI-like ctx filesystem tool. One tool for local paths and cloud ctx:// URIs.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          command: {
+            type: "string",
+            description: "CLI-like ctx command, for example: ls ctx://shiuing/defaultWorkspace --cloud or write ./notes/todo.md --text 'hello' --local",
+          },
+        },
+        required: ["command"],
+      },
+      async execute(_toolCallId: string, params: Record<string, unknown>) {
+        const command = String(params.command ?? "").trim();
+        if (!command) {
+          return toolContent(HELP_TEXT, { help: HELP_TEXT });
+        }
+        try {
+          const result = await runtime.run(command, { forceJson: false });
+          return toolContent(result.text, { output: result.output });
+        } catch (error) {
+          return toolContent(`ctx error: ${String(error)}`, { error: String(error) });
+        }
+      },
+    });
   },
 };
 

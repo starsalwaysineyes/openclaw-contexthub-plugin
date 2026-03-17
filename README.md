@@ -1,179 +1,97 @@
 # openclaw-contexthub-plugin
 
-Official plugin maintained by MemTensor.
+This repo is now the minimal `ctx` plugin line on `main`.
 
-OpenClaw tool-first plugin for ContextHub.
+The old query/record-first ContextHub plugin line is preserved on the `feat` branch.
 
-Current focus:
+## What this plugin does
 
-- cfg-driven pre-answer recall
-- default recall scope = `L0` only
-- no automatic memory writing
-- explicit upload of cached full session transcript to `L2` for raw retrieval
-- keep backend semantics generic (`L0` / `L1` / `L2` are explicit targets)
-- treat local archive/daily-memory behavior as migration presets, not product rules
+It registers exactly two user-facing surfaces:
 
-## What this plugin should eventually do
+- command: `/ctx`
+- tool: `ctx`
 
-### Read
+Both use the same CLI-like grammar and can operate on:
 
-- query ContextHub before answering
-- default to `L0` only for pre-answer recall
-- allow config overrides for partitions / layers / tags / limit / rerank
-- inject recalled snippets through `prependContext`
+- local filesystem paths
+- cloud `ctx://` URIs backed by the phase-1 ContextHub filesystem service
 
-### Write
+Current focus is practical operator use, not memory-slot ownership.
 
-- save explicit text to `L0` / `L1` / `L2`
-- commit curated session summaries when a human explicitly wants it
-- avoid low-quality automatic memory writing
+## Supported ops
 
-### Upload / Import
+- `register-workspace`
+- `mkdir`
+- `ls`
+- `tree`
+- `stat`
+- `read`
+- `write`
+- `edit`
+- `apply-patch`
+- `mv`
+- `cp`
+- `rm`
+- `search`
+- `glob`
+- `grep`
+- `rg`
+- `import-tree`
 
-- upload a local file directly to `L0` / `L1` / `L2`
-- upload the cached full OpenClaw session transcript to `L2` for raw retrieval
-- import a local folder or batch with an optional preset
-- trigger derivation into lower layers only when explicitly useful
+## Config
 
-### Inspect
-
-- check derivation job status
-- inspect record links
-- explain why a recall happened
-- inspect the currently cached last session before uploading it
-
-## Current implementation status
-
-Implemented in this repo now:
-
-- minimal `before_agent_start` hook
-- `agent_end` cache of the last completed session transcript (no automatic write)
-- ContextHub HTTP client for `query`, `grep`, `readRecordLines`, `importResource`, `commitSession`, `getDerivationJob`, `listDerivationJobs`, `redriveDerivationJobs`, `listRecordLinks`
-- config resolution from plugin config + env
-- agent-facing tools:
-  - `ctx_query`
-  - `ctx_tree`
-  - `ctx_list`
-  - `ctx_read`
-  - `ctx_grep`
-  - `ctx_write_text` (optional)
-  - `ctx_import_file` (optional)
-  - `ctx_import_preset` (optional)
-  - `ctx_job`
-  - `ctx_jobs`
-  - `ctx_redrive`
-  - `ctx_links`
-- preferred short operator entrypoint:
-  - `/ctx q ...`
-  - `/ctx g ...`
-  - `/ctx t ...`
-  - `/ctx ls ...`
-  - `/ctx r ...`
-  - `/ctx s ...`
-  - `/ctx c ...`
-  - `/ctx f ...`
-  - `/ctx ip ...`
-  - `/ctx j ...`
-  - `/ctx jl ...`
-  - `/ctx jr ...`
-  - `/ctx l ...`
-  - `/ctx last`
-  - `/ctx up ...`
-- long-form compatibility commands are still available:
-  - `/contexthub-recall`
-  - `/contexthub-query <query> [:: partitions] [:: layers] [:: tags] [:: limit] [:: rerank] [--json]`
-  - `/contexthub-grep <pattern> [:: partitions] [:: layers] [:: tags] [:: limit] [:: regex] [:: caseSensitive] [--json]`
-  - `/contexthub-presets`
-  - `/contexthub-read <recordId> [:: fromLine] [:: limit] [--json]`
-  - `/contexthub-last-session`
-  - `/contexthub-upload-last-session <partitionKey|-> [:: title]`
-  - `/contexthub-save <layer> <partitionKey|-> <title> :: <text>`
-  - `/contexthub-commit <partitionKey|-> <summary> [:: memoryTitle :: memoryText]`
-  - `/contexthub-import-file <layer> <partitionKey|-> <filePath> [:: title]`
-  - `/contexthub-import-preset <presetName> [limit] [--dry-run]`
-  - `/contexthub-job <jobId>`
-  - `/contexthub-jobs [:: partitions] [:: statuses] [:: sourceRecordId] [:: limit] [:: offset] [--json]`
-  - `/contexthub-redrive [:: partitions] [:: statuses] [:: jobIds] [:: dryRun] [:: limit] [:: reason] [--json]`
-  - `/contexthub-links <recordId>`
-- GitHub Actions CI: `npm ci` + `npm run check`
-
-Not implemented yet:
-
-- operator-friendly explain-recall output beyond the current compact summary / `--json` split (record-level grouping plus effective-scope hints now exist, but trace explanation is still thin)
-- true file/blob upload once backend supports non-inline payloads
-- richer preset lifecycle and validation UX
-- smarter capture rules so `/contexthub-last-session` can optionally track non-chat command flows too
-
-## Config shape
+Example plugin config in `~/.openclaw/openclaw.json`:
 
 ```json
 {
-  "baseUrl": "http://127.0.0.1:4040",
-  "tenantId": "tenant_xxx",
-  "defaultPartitionKey": "project-contexthub",
-  "recall": {
-    "preAnswer": {
-      "enabled": true,
-      "partitions": ["project-contexthub", "memory"],
-      "layers": ["l0"],
-      "limit": 5,
-      "rerank": false
-    }
-  },
-  "importPresets": {
-    "archive-to-l1": {
-      "rootPath": "/Users/me/archive",
-      "partitionKey": "project-contexthub",
-      "layer": "l1",
-      "deriveLayers": ["l0"],
-      "deriveMode": "async",
-      "recordType": "summary",
-      "sourceKind": "local_file",
-      "relativePathPrefix": "archive",
-      "promptPreset": "archive_and_memory",
-      "metadata": { "migrationPreset": "archive" },
-      "includeGlobs": ["**/*.md"],
-      "excludeGlobs": ["drafts/**"],
-      "tags": ["archive", "migration"]
+  "plugins": {
+    "load": {
+      "paths": [
+        "/Users/shiuing/Desktop/funcode/openclaw-contexthub-plugin"
+      ]
+    },
+    "allow": [
+      "openclaw-contexthub-plugin"
+    ],
+    "entries": {
+      "openclaw-contexthub-plugin": {
+        "enabled": true,
+        "config": {
+          "baseUrl": "http://38.55.39.92:24040",
+          "token": "<bearer token>",
+          "defaultUserId": "shiuing",
+          "localRoot": "/Users/shiuing/.openclaw/workspace",
+          "timeoutMs": 30000
+        }
+      }
     }
   }
 }
 ```
 
-## Env fallback
+## Command examples
 
-```bash
-cp .env.example .env
-npm ci
-npm run check
+```text
+/ctx ls ./memory --local
+/ctx read ./memory/2026-03-17.md --local
+/ctx stat ctx://shiuing/defaultWorkspace --cloud
+/ctx mkdir ctx://shiuing/defaultWorkspace/tasks --cloud
+/ctx write ctx://shiuing/defaultWorkspace/tasks/today.md --text "hello" --cloud
+/ctx grep cloud --scope-uri ctx://shiuing/defaultWorkspace --user-id shiuing --cloud
+/ctx import-tree ./memory ctx://shiuing/defaultWorkspace/memory --include '*.md' --exclude 'archive/**' --cloud
 ```
 
-Key env vars:
+## Tool example
 
-- `CONTEXT_HUB_BASE_URL`
-- `CONTEXT_HUB_TOKEN`
-- `CONTEXT_HUB_TENANT_ID`
-- `CONTEXT_HUB_DEFAULT_PARTITION_KEY`
-- `CONTEXT_HUB_RECALL_ENABLED`
-- `CONTEXT_HUB_RECALL_PARTITIONS`
-- `CONTEXT_HUB_RECALL_LAYERS`
-- `CONTEXT_HUB_RECALL_LIMIT`
-- `CONTEXT_HUB_RECALL_RERANK`
+```json
+{
+  "command": "ls ctx://shiuing/defaultWorkspace --cloud"
+}
+```
 
-## Agent workflow view
+## Development
 
-An agent needs four practical abilities:
-
-1. recall short pointers before answering (`L0` by default)
-2. save explicit conclusions to chosen layers when explicitly asked
-3. upload raw session/doc/file content when a human wants raw retrieval
-4. inspect async jobs and links when something looks wrong
-
-This repo now covers all four at a first-pass level, plus preset-based batch import flow, explicit last-session upload, the first line-oriented read/grep bridge to ContextHub, a shorter `/ctx` operator surface, the first agent-facing `registerTool(...)` layer, tag-scoped collaboration filters across query/tree/list/grep surfaces, and richer import presets for migration mapping (`recordType`, `sourceKind`, `relativePathPrefix`, `promptPreset`, `metadata`).
-
-## Product rule that should stay
-
-- backend stays layer-first and path-agnostic
-- plugin presets may map local structures like `archive/` -> `L1`
-- those presets must not become mandatory backend semantics
-- raw session upload should stay explicit, not automatic
+```bash
+npm run check
+npm run build
+```

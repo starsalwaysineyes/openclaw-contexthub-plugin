@@ -1,62 +1,24 @@
 {
   "id": "openclaw-contexthub-plugin",
-  "name": "OpenClaw ContextHub Plugin",
-  "description": "ContextHub recall, write, import, and raw session upload bridge for OpenClaw.",
-  "version": "0.1.0",
+  "name": "OpenClaw Ctx Plugin",
+  "description": "A single /ctx command and ctx tool for local filesystem paths and ContextHub ctx:// cloud filesystem operations.",
+  "version": "0.2.0",
   "configSchema": {
     "type": "object",
     "additionalProperties": true,
     "properties": {
       "baseUrl": { "type": "string" },
       "token": { "type": "string" },
-      "tenantId": { "type": "string" },
-      "defaultPartitionKey": { "type": "string" },
-      "recall": {
-        "type": "object",
-        "additionalProperties": true,
-        "properties": {
-          "preAnswer": {
-            "type": "object",
-            "additionalProperties": true,
-            "properties": {
-              "enabled": { "type": "boolean" },
-              "partitions": { "type": "array", "items": { "type": "string" } },
-              "layers": { "type": "array", "items": { "type": "string", "enum": ["l0", "l1", "l2"] } },
-              "limit": { "type": "number" },
-              "rerank": { "type": "boolean" }
-            }
-          }
-        }
-      },
-      "importPresets": {
-        "type": "object",
-        "additionalProperties": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "rootPath": { "type": "string" },
-            "partitionKey": { "type": "string" },
-            "layer": { "type": "string", "enum": ["l0", "l1", "l2"] },
-            "deriveLayers": { "type": "array", "items": { "type": "string", "enum": ["l0", "l1", "l2"] } },
-            "deriveMode": { "type": "string", "enum": ["sync", "async"] },
-            "limit": { "type": "number" },
-            "tags": { "type": "array", "items": { "type": "string" } },
-            "recordType": { "type": "string" },
-            "sourceKind": { "type": "string" },
-            "relativePathPrefix": { "type": "string" },
-            "promptPreset": { "type": "string" },
-            "metadata": { "type": "object", "additionalProperties": true },
-            "includeGlobs": { "type": "array", "items": { "type": "string" } },
-            "excludeGlobs": { "type": "array", "items": { "type": "string" } }
-          }
-        }
-      }
+      "defaultUserId": { "type": "string" },
+      "localRoot": { "type": "string" },
+      "timeoutMs": { "type": "number" }
     }
   },
   "uiHints": {
-    "baseUrl": { "label": "ContextHub Base URL", "placeholder": "http://127.0.0.1:4040" },
-    "token": { "label": "ContextHub Token", "sensitive": true },
-    "tenantId": { "label": "Tenant ID" },
-    "defaultPartitionKey": { "label": "Default Partition Key" }
+    "baseUrl": { "label": "ContextHub Base URL", "placeholder": "http://38.55.39.92:24040" },
+    "token": { "label": "Bearer Token", "sensitive": true },
+    "defaultUserId": { "label": "Default Cloud userId", "placeholder": "shiuing" },
+    "localRoot": { "label": "Local Root", "placeholder": "/Users/shiuing/.openclaw/workspace" },
+    "timeoutMs": { "label": "HTTP Timeout (ms)" }
   }
 }

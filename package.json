@@ -1,7 +1,7 @@
 {
   "name": "openclaw-contexthub-plugin",
-  "version": "0.1.0",
-  "description": "OpenClaw plugin for ContextHub recall, write, and import workflows",
+  "version": "0.2.0",
+  "description": "OpenClaw ctx plugin for local paths and ContextHub phase-1 ctx:// filesystem operations",
   "author": "MemTensor",
   "license": "MIT",
   "type": "module",
@@ -10,7 +10,6 @@
     "index.ts",
     "src",
     "README.md",
-    ".env.example",
     "tsconfig.json"
   ],
   "openclaw": {

@@ -59,9 +59,9 @@ Example plugin config in `~/.openclaw/openclaw.json`:
       "openclaw-contexthub-plugin": {
         "enabled": true,
         "config": {
-          "baseUrl": "http://38.55.39.92:24040",
+          "baseUrl": "http://YOUR_HOST:24040",
           "token": "<bearer token>",
-          "defaultUserId": "shiuing",
+          "defaultUserId": "YOUR_USER_ID",
           "localRoot": "/Users/shiuing/.openclaw/workspace",
           "timeoutMs": 30000
         }

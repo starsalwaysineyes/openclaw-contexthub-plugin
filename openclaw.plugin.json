@@ -15,9 +15,9 @@
     }
   },
   "uiHints": {
-    "baseUrl": { "label": "ContextHub Base URL", "placeholder": "http://38.55.39.92:24040" },
+    "baseUrl": { "label": "ContextHub Base URL", "placeholder": "http://YOUR_HOST:24040" },
     "token": { "label": "Bearer Token", "sensitive": true },
-    "defaultUserId": { "label": "Default Cloud userId", "placeholder": "shiuing" },
+    "defaultUserId": { "label": "Default Cloud userId", "placeholder": "YOUR_USER_ID" },
     "localRoot": { "label": "Local Root", "placeholder": "/Users/shiuing/.openclaw/workspace" },
     "timeoutMs": { "label": "HTTP Timeout (ms)" }
   }
